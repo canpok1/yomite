@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // Provider はLLMプロバイダのインターフェースを定義する。
 type Provider interface {
@@ -53,4 +56,59 @@ func BuildPrompt(req SimulationRequest) (system string, user string) {
 		req.CurrentIndex)
 
 	return system, user
+}
+
+// ErrInvalidJSON はAIレスポンスが不正なJSONの場合のエラーを表す。
+type ErrInvalidJSON struct {
+	Raw string
+	Err error
+}
+
+func (e *ErrInvalidJSON) Error() string {
+	return fmt.Sprintf("invalid JSON response: %v", e.Err)
+}
+
+func (e *ErrInvalidJSON) Unwrap() error {
+	return e.Err
+}
+
+// ErrIndexOutOfRange はAIレスポンスのインデックスが範囲外の場合のエラーを表す。
+type ErrIndexOutOfRange struct {
+	Field string
+	Index int
+	Max   int
+}
+
+func (e *ErrIndexOutOfRange) Error() string {
+	return fmt.Sprintf("index out of range: %s=%d (valid range: 0-%d)", e.Field, e.Index, e.Max-1)
+}
+
+// ParseResponse はAIのテキスト出力からSimulationResponseをパースし、インデックスの範囲を検証する。
+func ParseResponse(text string, totalSentences int) (SimulationResponse, error) {
+	var resp SimulationResponse
+
+	if err := json.Unmarshal([]byte(text), &resp); err != nil {
+		return resp, &ErrInvalidJSON{Raw: text, Err: err}
+	}
+
+	if resp.CurrentIndex < 0 || resp.CurrentIndex >= totalSentences {
+		return resp, &ErrIndexOutOfRange{
+			Field: "current_index",
+			Index: resp.CurrentIndex,
+			Max:   totalSentences,
+		}
+	}
+
+	if resp.NextIndex != nil {
+		idx := *resp.NextIndex
+		if idx < 0 || idx >= totalSentences {
+			return resp, &ErrIndexOutOfRange{
+				Field: "next_index",
+				Index: idx,
+				Max:   totalSentences,
+			}
+		}
+	}
+
+	return resp, nil
 }
