@@ -270,4 +270,3 @@ func isErrIndexOutOfRange(err error) bool {
 	_, ok := err.(*ErrIndexOutOfRange)
 	return ok
 }
-
