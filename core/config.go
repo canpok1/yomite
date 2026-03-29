@@ -12,14 +12,14 @@ const defaultOrigin = "http://localhost:11434"
 
 // Config はアプリケーション全体の設定を保持する。
 type Config struct {
-	DefaultProvider string              `json:"default_provider"`
-	DefaultPersona  string              `json:"default_persona"`
-	Providers       map[string]Provider `json:"providers"`
-	Personas        map[string]Persona  `json:"personas"`
+	DefaultProvider string                    `json:"default_provider"`
+	DefaultPersona  string                    `json:"default_persona"`
+	Providers       map[string]ProviderConfig `json:"providers"`
+	Personas        map[string]Persona        `json:"personas"`
 }
 
-// Provider はLLMプロバイダの接続情報を表す。
-type Provider struct {
+// ProviderConfig はLLMプロバイダの接続情報を表す。
+type ProviderConfig struct {
 	Type   string `json:"type"`
 	Model  string `json:"model"`
 	Origin string `json:"origin"`
@@ -137,7 +137,7 @@ func mergeConfig(base, override *Config) *Config {
 	merged := Config{
 		DefaultProvider: base.DefaultProvider,
 		DefaultPersona:  base.DefaultPersona,
-		Providers:       make(map[string]Provider, len(base.Providers)),
+		Providers:       make(map[string]ProviderConfig, len(base.Providers)),
 		Personas:        make(map[string]Persona, len(base.Personas)),
 	}
 	for k, v := range base.Providers {
