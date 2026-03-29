@@ -17,5 +17,8 @@ fi
 
 # ollamaにモデルをpull（未ダウンロードの場合のみ実行される）
 echo "Pulling qwen3:1.7b model from Ollama..."
-curl -s http://ollama:11434/api/pull -d '{"name": "qwen3:1.7b"}'
+curl --fail --show-error --silent \
+  --retry 10 --retry-delay 3 --retry-connrefused \
+  http://ollama:11434/api/pull \
+  -d '{"name": "qwen3:1.7b"}' > /dev/null
 echo "Ollama model pull completed."
