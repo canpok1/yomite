@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -96,7 +97,8 @@ func TestLoadConfig_ExplicitPath(t *testing.T) {
 }
 
 func TestLoadConfig_ExplicitPathNotFound(t *testing.T) {
-	_, err := LoadConfig("/nonexistent/path/config.json")
+	nonExistentPath := filepath.Join(t.TempDir(), "not-found.json")
+	_, err := LoadConfig(nonExistentPath)
 	if err == nil {
 		t.Fatal("expected error for nonexistent config path")
 	}
@@ -177,6 +179,32 @@ func TestLoadConfig_MergeBothExist(t *testing.T) {
 	// ローカルのproviderも追加される
 	if _, ok := cfg.Providers["local_p"]; !ok {
 		t.Error("local provider should exist after merge")
+	}
+
+	// グローバルのpersonaも残る
+	if _, ok := cfg.Personas["global_persona"]; !ok {
+		t.Error("global persona should still exist after merge")
+	}
+	// ローカルのpersonaも追加される
+	if _, ok := cfg.Personas["local_persona"]; !ok {
+		t.Error("local persona should exist after merge")
+	}
+}
+
+func TestLoadConfig_InvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	invalidPath := filepath.Join(dir, "yomite.json")
+	if err := os.WriteFile(invalidPath, []byte("{invalid json}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := loadConfigFromPaths(invalidPath, filepath.Join(dir, "nonexistent.json"))
+	if err == nil {
+		t.Fatal("expected error for invalid JSON config")
+	}
+	// エラーメッセージがJSONパースエラーであること（"no config file found"ではない）
+	if got := err.Error(); !strings.Contains(got, "failed to load local config") {
+		t.Errorf("expected local config error, got: %s", got)
 	}
 }
 

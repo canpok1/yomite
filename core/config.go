@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -58,6 +59,12 @@ func loadConfigFromPaths(localPath, globalPath string) (*Config, error) {
 	localCfg, localErr := loadConfigFile(localPath)
 	globalCfg, globalErr := loadConfigFile(globalPath)
 
+	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
+		return nil, fmt.Errorf("failed to load local config %s: %w", localPath, localErr)
+	}
+	if globalErr != nil && !errors.Is(globalErr, os.ErrNotExist) {
+		return nil, fmt.Errorf("failed to load global config %s: %w", globalPath, globalErr)
+	}
 	if localErr != nil && globalErr != nil {
 		return nil, fmt.Errorf("no config file found: checked %s and %s", localPath, globalPath)
 	}
@@ -127,7 +134,18 @@ func validate(cfg *Config) error {
 }
 
 func mergeConfig(base, override *Config) *Config {
-	merged := *base
+	merged := Config{
+		DefaultProvider: base.DefaultProvider,
+		DefaultPersona:  base.DefaultPersona,
+		Providers:       make(map[string]Provider, len(base.Providers)),
+		Personas:        make(map[string]Persona, len(base.Personas)),
+	}
+	for k, v := range base.Providers {
+		merged.Providers[k] = v
+	}
+	for k, v := range base.Personas {
+		merged.Personas[k] = v
+	}
 
 	if override.DefaultProvider != "" {
 		merged.DefaultProvider = override.DefaultProvider
@@ -136,15 +154,8 @@ func mergeConfig(base, override *Config) *Config {
 		merged.DefaultPersona = override.DefaultPersona
 	}
 
-	if merged.Providers == nil {
-		merged.Providers = make(map[string]Provider)
-	}
 	for k, v := range override.Providers {
 		merged.Providers[k] = v
-	}
-
-	if merged.Personas == nil {
-		merged.Personas = make(map[string]Persona)
 	}
 	for k, v := range override.Personas {
 		merged.Personas[k] = v
