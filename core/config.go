@@ -54,6 +54,11 @@ func LoadConfig(explicitPath string) (*Config, error) {
 		return nil, fmt.Errorf("failed to determine global config path: %w", err)
 	}
 
+	return loadConfigFromPaths(localPath, globalPath)
+}
+
+// loadConfigFromPaths はローカルとグローバルのパスから設定を読み込み、マージする。
+func loadConfigFromPaths(localPath, globalPath string) (*Config, error) {
 	localCfg, localErr := loadConfigFile(localPath)
 	globalCfg, globalErr := loadConfigFile(globalPath)
 

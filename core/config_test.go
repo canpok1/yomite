@@ -115,3 +115,140 @@ func TestLoadConfig_ExplicitPathNotFound(t *testing.T) {
 		t.Fatal("expected error for nonexistent config path")
 	}
 }
+
+func TestLoadConfig_LocalOnly(t *testing.T) {
+	dir := t.TempDir()
+	localPath := filepath.Join(dir, "yomite.json")
+	writeTestConfig(t, localPath, "local_only", "persona_a", map[string]Provider{
+		"local_only": {Type: "ollama", Model: "gemma2"},
+	}, map[string]Persona{
+		"persona_a": {DisplayName: "A", SystemPrompt: "a", MemoryCapacity: 100, MaxSteps: 10},
+	})
+
+	cfg, err := loadConfigFromPaths(localPath, filepath.Join(dir, "nonexistent.json"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.DefaultProvider != "local_only" {
+		t.Errorf("DefaultProvider: got %q, want %q", cfg.DefaultProvider, "local_only")
+	}
+}
+
+func TestLoadConfig_GlobalOnly(t *testing.T) {
+	dir := t.TempDir()
+	globalPath := filepath.Join(dir, "config.json")
+	writeTestConfig(t, globalPath, "global_only", "persona_b", map[string]Provider{
+		"global_only": {Type: "ollama", Model: "llama3"},
+	}, map[string]Persona{
+		"persona_b": {DisplayName: "B", SystemPrompt: "b", MemoryCapacity: 200, MaxSteps: 20},
+	})
+
+	cfg, err := loadConfigFromPaths(filepath.Join(dir, "nonexistent.json"), globalPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.DefaultProvider != "global_only" {
+		t.Errorf("DefaultProvider: got %q, want %q", cfg.DefaultProvider, "global_only")
+	}
+}
+
+func TestLoadConfig_MergeBothExist(t *testing.T) {
+	dir := t.TempDir()
+	localPath := filepath.Join(dir, "yomite.json")
+	globalPath := filepath.Join(dir, "config.json")
+
+	// グローバル: provider=global_p, persona=global_persona
+	writeTestConfig(t, globalPath, "global_p", "global_persona", map[string]Provider{
+		"global_p": {Type: "ollama", Model: "gemma2", Origin: "http://remote:11434"},
+	}, map[string]Persona{
+		"global_persona": {DisplayName: "Global", SystemPrompt: "global", MemoryCapacity: 100, MaxSteps: 10},
+	})
+
+	// ローカル: provider=local_p, persona=local_persona（上書き）
+	writeTestConfig(t, localPath, "local_p", "local_persona", map[string]Provider{
+		"local_p": {Type: "ollama", Model: "llama3"},
+	}, map[string]Persona{
+		"local_persona": {DisplayName: "Local", SystemPrompt: "local", MemoryCapacity: 300, MaxSteps: 30},
+	})
+
+	cfg, err := loadConfigFromPaths(localPath, globalPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// ローカルで上書き
+	if cfg.DefaultProvider != "local_p" {
+		t.Errorf("DefaultProvider: got %q, want %q", cfg.DefaultProvider, "local_p")
+	}
+	if cfg.DefaultPersona != "local_persona" {
+		t.Errorf("DefaultPersona: got %q, want %q", cfg.DefaultPersona, "local_persona")
+	}
+
+	// グローバルのproviderも残る
+	if _, ok := cfg.Providers["global_p"]; !ok {
+		t.Error("global provider should still exist after merge")
+	}
+	// ローカルのproviderも追加される
+	if _, ok := cfg.Providers["local_p"]; !ok {
+		t.Error("local provider should exist after merge")
+	}
+}
+
+func TestLoadConfig_NeitherExists(t *testing.T) {
+	dir := t.TempDir()
+	_, err := loadConfigFromPaths(
+		filepath.Join(dir, "nonexistent1.json"),
+		filepath.Join(dir, "nonexistent2.json"),
+	)
+	if err == nil {
+		t.Fatal("expected error when neither config exists")
+	}
+}
+
+func TestValidate_InvalidDefaultProvider(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	writeTestConfig(t, configPath, "nonexistent", "test", map[string]Provider{
+		"local": {Type: "ollama", Model: "gemma2"},
+	}, map[string]Persona{
+		"test": {DisplayName: "T", SystemPrompt: "t", MemoryCapacity: 100, MaxSteps: 10},
+	})
+
+	_, err := LoadConfig(configPath)
+	if err == nil {
+		t.Fatal("expected validation error for invalid default_provider")
+	}
+}
+
+func TestValidate_InvalidDefaultPersona(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	writeTestConfig(t, configPath, "local", "nonexistent", map[string]Provider{
+		"local": {Type: "ollama", Model: "gemma2"},
+	}, map[string]Persona{
+		"test": {DisplayName: "T", SystemPrompt: "t", MemoryCapacity: 100, MaxSteps: 10},
+	})
+
+	_, err := LoadConfig(configPath)
+	if err == nil {
+		t.Fatal("expected validation error for invalid default_persona")
+	}
+}
+
+// writeTestConfig はテスト用の設定ファイルを書き出すヘルパー。
+func writeTestConfig(t *testing.T, path, defaultProvider, defaultPersona string, providers map[string]Provider, personas map[string]Persona) {
+	t.Helper()
+	cfg := Config{
+		DefaultProvider: defaultProvider,
+		DefaultPersona:  defaultPersona,
+		Providers:       providers,
+		Personas:        personas,
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
