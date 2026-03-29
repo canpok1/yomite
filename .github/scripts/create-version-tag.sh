@@ -56,3 +56,8 @@ else
     git push origin "$NEW_VERSION"
     echo "タグ $NEW_VERSION をプッシュしました。"
 fi
+
+# GITHUB_OUTPUT が設定されている場合、新しいバージョンを出力
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+    echo "tag=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+fi

@@ -17,11 +17,8 @@ jobs:
           fetch-depth: 0
 
       - name: Create and push version tag
-        run: ./.github/scripts/create-version-tag.sh
-
-      - name: Get created tag
         id: create-tag
-        run: echo "tag=$(git describe --tags --abbrev=0)" >> "$GITHUB_OUTPUT"
+        run: ./.github/scripts/create-version-tag.sh
 
   release:
     needs: create-version-tag
