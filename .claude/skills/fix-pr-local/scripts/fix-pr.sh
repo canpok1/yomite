@@ -21,9 +21,9 @@ fi
 # リポジトリ名を git remote URL から取得（--repo フラグで使用する）
 # github.com 直接アクセスとプロキシ経由（/git/owner/repo）の両方に対応
 REMOTE_URL=$(git remote get-url origin 2>/dev/null || true)
-if [[ "$REMOTE_URL" =~ github\.com[:/]([^/]+/[^/.]+) ]]; then
+if [[ "$REMOTE_URL" =~ github\.com[:/]([^/]+/[^/]+) ]]; then
   REPO="${BASH_REMATCH[1]}"
-elif [[ "$REMOTE_URL" =~ /git/([^/]+/[^/.]+) ]]; then
+elif [[ "$REMOTE_URL" =~ /git/([^/]+/[^/]+) ]]; then
   REPO="${BASH_REMATCH[1]}"
 else
   echo "ERROR: origin の remote URL から GitHub リポジトリを特定できません。" >&2
