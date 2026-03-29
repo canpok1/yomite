@@ -41,11 +41,7 @@ func LoadConfig(explicitPath string) (*Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to load config from %s: %w", explicitPath, err)
 		}
-		applyDefaults(cfg)
-		if err := validate(cfg); err != nil {
-			return nil, err
-		}
-		return cfg, nil
+		return finalizeConfig(cfg)
 	}
 
 	localPath := "yomite.json"
@@ -76,6 +72,10 @@ func loadConfigFromPaths(localPath, globalPath string) (*Config, error) {
 		cfg = globalCfg
 	}
 
+	return finalizeConfig(cfg)
+}
+
+func finalizeConfig(cfg *Config) (*Config, error) {
 	applyDefaults(cfg)
 	if err := validate(cfg); err != nil {
 		return nil, err

@@ -7,20 +7,6 @@ import (
 	"testing"
 )
 
-// テストリスト（シンプル→複雑の順）:
-//
-// 1. Config構造体のJSONラウンドトリップ（Provider/Persona含む）
-// 2. Provider.Origin のデフォルト値設定
-// 3. 明示パス指定でファイルを読み込める
-// 4. 明示パスのファイルが存在しない場合エラー
-// 5. ローカル yomite.json のみ存在 → 読み込み成功
-// 6. グローバル config.json のみ存在 → 読み込み成功
-// 7. 両方存在 → グローバルベースにローカルで上書きマージ
-// 8. どちらも存在しない → エラー
-// 9. default_provider が providers に存在しない → バリデーションエラー
-// 10. default_persona が personas に存在しない → バリデーションエラー
-// 11. バリデーション成功ケース
-
 func TestConfigJSONRoundTrip(t *testing.T) {
 	original := Config{
 		DefaultProvider: "local_ollama",
