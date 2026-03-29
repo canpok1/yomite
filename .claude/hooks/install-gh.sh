@@ -76,7 +76,17 @@ if ! curl -fsSL "${CHECKSUMS_URL}" -o "${CHECKSUMS_NAME}"; then
   echo "Error: Failed to download checksums from ${CHECKSUMS_URL}" >&2
   exit 1
 fi
-if ! grep "${ARCHIVE_NAME}" "${CHECKSUMS_NAME}" | sha256sum -c --status 2>/dev/null; then
+EXPECTED_CHECKSUM=$(grep "${ARCHIVE_NAME}" "${CHECKSUMS_NAME}" | awk '{print $1}')
+if [[ -z "${EXPECTED_CHECKSUM}" ]]; then
+  echo "Error: Checksum not found for ${ARCHIVE_NAME}" >&2
+  exit 1
+fi
+if [[ "${OS}" == "macOS" ]]; then
+  ACTUAL_CHECKSUM=$(shasum -a 256 "${ARCHIVE_NAME}" | awk '{print $1}')
+else
+  ACTUAL_CHECKSUM=$(sha256sum "${ARCHIVE_NAME}" | awk '{print $1}')
+fi
+if [[ "${EXPECTED_CHECKSUM}" != "${ACTUAL_CHECKSUM}" ]]; then
   echo "Error: SHA256 checksum verification failed for ${ARCHIVE_NAME}" >&2
   exit 1
 fi
