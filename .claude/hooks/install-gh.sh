@@ -62,11 +62,25 @@ echo "Downloading gh ${VERSION} for ${OS}/${ARCH}..."
 
 TEMP_DIR=$(mktemp -d)
 
+CHECKSUMS_NAME="gh_${VERSION}_checksums.txt"
+CHECKSUMS_URL="https://github.com/cli/cli/releases/download/v${VERSION}/${CHECKSUMS_NAME}"
+
 cd "${TEMP_DIR}"
 if ! curl -fsSL "${URL}" -o "${ARCHIVE_NAME}"; then
   echo "Error: Failed to download from ${URL}" >&2
   exit 1
 fi
+
+# チェックサム検証
+if ! curl -fsSL "${CHECKSUMS_URL}" -o "${CHECKSUMS_NAME}"; then
+  echo "Error: Failed to download checksums from ${CHECKSUMS_URL}" >&2
+  exit 1
+fi
+if ! grep "${ARCHIVE_NAME}" "${CHECKSUMS_NAME}" | sha256sum -c --status 2>/dev/null; then
+  echo "Error: SHA256 checksum verification failed for ${ARCHIVE_NAME}" >&2
+  exit 1
+fi
+echo "Checksum verification passed."
 
 if [[ "${ARCHIVE_EXT}" == "zip" ]]; then
   if ! unzip -q "${ARCHIVE_NAME}"; then
@@ -97,13 +111,13 @@ echo "gh installed to ${INSTALL_DIR}/gh"
 export PATH="${INSTALL_DIR}:${PATH}"
 
 # セッション間でPATHを維持するため環境ファイルに永続化
-if [[ -n "${CLAUDE_ENV_FILE:-}" ]]; then
-  if ! grep -q "export PATH=.*${INSTALL_DIR}" "${CLAUDE_ENV_FILE}" 2>/dev/null; then
-    echo "export PATH=\"${INSTALL_DIR}:\${PATH}\"" >> "${CLAUDE_ENV_FILE}"
-    echo "PATH setting persisted to ${CLAUDE_ENV_FILE}"
-  fi
-else
-  echo "Warning: CLAUDE_ENV_FILE is not set. PATH will not be persisted across sessions." >&2
+if [[ -z "${CLAUDE_ENV_FILE:-}" ]]; then
+  echo "Error: CLAUDE_ENV_FILE is not set; cannot persist PATH for subsequent hooks/scripts." >&2
+  exit 1
+fi
+if ! grep -Fq "export PATH=\"${INSTALL_DIR}:\${PATH}\"" "${CLAUDE_ENV_FILE}" 2>/dev/null; then
+  echo "export PATH=\"${INSTALL_DIR}:\${PATH}\"" >> "${CLAUDE_ENV_FILE}"
+  echo "PATH setting persisted to ${CLAUDE_ENV_FILE}"
 fi
 
 if [[ -n "${GH_TOKEN:-}" ]] || [[ -n "${GITHUB_TOKEN:-}" ]]; then
