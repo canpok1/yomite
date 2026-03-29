@@ -2,6 +2,8 @@ package core
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -71,5 +73,45 @@ func TestConfigJSONRoundTrip(t *testing.T) {
 	}
 	if persona.DisplayName != "初学者" || persona.MemoryCapacity != 200 || persona.MaxSteps != 100 {
 		t.Errorf("Persona mismatch: %+v", persona)
+	}
+}
+
+func TestLoadConfig_ExplicitPath(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	content := `{
+		"default_provider": "local",
+		"default_persona": "test",
+		"providers": {
+			"local": {"type": "ollama", "model": "gemma2"}
+		},
+		"personas": {
+			"test": {"display_name": "テスト", "system_prompt": "テスト用", "memory_capacity": 100, "max_steps": 50}
+		}
+	}`
+	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	if cfg.DefaultProvider != "local" {
+		t.Errorf("DefaultProvider: got %q, want %q", cfg.DefaultProvider, "local")
+	}
+
+	// Origin が未指定の場合、デフォルト値が設定されること
+	p := cfg.Providers["local"]
+	if p.Origin != "http://localhost:11434" {
+		t.Errorf("Origin default: got %q, want %q", p.Origin, "http://localhost:11434")
+	}
+}
+
+func TestLoadConfig_ExplicitPathNotFound(t *testing.T) {
+	_, err := LoadConfig("/nonexistent/path/config.json")
+	if err == nil {
+		t.Fatal("expected error for nonexistent config path")
 	}
 }
