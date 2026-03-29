@@ -14,3 +14,8 @@ if [ ! -f "${SCRIPT_DIR}/.env" ]; then
     echo ".env file created from template."
   fi
 fi
+
+# ollamaにモデルをpull（未ダウンロードの場合のみ実行される）
+echo "Pulling qwen3:1.7b model from Ollama..."
+curl -s http://ollama:11434/api/pull -d '{"name": "qwen3:1.7b"}'
+echo "Ollama model pull completed."
