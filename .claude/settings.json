@@ -65,6 +65,17 @@
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/install-gh.sh",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
     "Notification": [
       {
         "hooks": [
