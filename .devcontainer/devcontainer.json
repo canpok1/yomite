@@ -1,0 +1,41 @@
+{
+  "name": "Ubuntu",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/go:1": {},
+    "ghcr.io/devcontainers/features/node:1": {}
+  },
+  "remoteUser": "vscode",
+  "mounts": [
+    {
+      "source": "${localEnv:HOME}/.ssh",
+      "target": "/home/vscode/.ssh",
+      "type": "bind",
+      "readonly": true
+    },
+    {
+      "source": "claude-config",
+      "target": "/home/vscode/.claude",
+      "type": "volume"
+    }
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "mganss.host-notifier"
+      ]
+    }
+  },
+  "runArgs": [
+    "--env-file",
+    ".devcontainer/.env"
+  ],
+  "containerEnv": {
+    "WORKSPACE_DIR": "${containerWorkspaceFolder}"
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "waitFor": "postCreateCommand"
+}
