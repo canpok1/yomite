@@ -6,28 +6,6 @@ import (
 	"testing"
 )
 
-// テストリスト（シンプル→複雑の順）
-//
-// 型定義テスト:
-// TODO: SimulationRequest の各フィールドが正しく設定できる
-// TODO: SimulationResponse のJSONラウンドトリップ（全フィールドあり）
-// TODO: SimulationResponse のJSONラウンドトリップ（NextIndex=nil, Note=nil）
-//
-// プロンプト構築テスト:
-// TODO: BuildPrompt がシステムプロンプトを返す
-// TODO: BuildPrompt がユーザーメッセージにJSON出力フォーマット指示を含む
-// TODO: BuildPrompt がユーザーメッセージに現在の文・位置・記憶を含む
-// TODO: BuildPrompt で記憶が空の場合の動作
-//
-// レスポンスパーステスト:
-// TODO: ParseResponse が正常なJSONをパースできる
-// TODO: ParseResponse でNextIndex=null, Note=nullのパース
-// TODO: ParseResponse で不正なJSONに対してErrInvalidJSONを返す
-// TODO: ParseResponse で空文字列に対してErrInvalidJSONを返す
-// TODO: ParseResponse でcurrent_indexが範囲外の場合にErrIndexOutOfRangeを返す
-// TODO: ParseResponse でnext_indexが範囲外の場合にErrIndexOutOfRangeを返す
-// TODO: ParseResponse でnext_indexが負数の場合にErrIndexOutOfRangeを返す
-
 func TestSimulationResponseJSONRoundTrip(t *testing.T) {
 	nextIdx := 6
 	resp := SimulationResponse{
@@ -79,10 +57,10 @@ func TestSimulationResponseJSONRoundTripNil(t *testing.T) {
 
 	// null がJSONに含まれることを確認
 	jsonStr := string(data)
-	if !contains(jsonStr, `"next_index":null`) {
+	if !strings.Contains(jsonStr, `"next_index":null`) {
 		t.Errorf("expected next_index:null in JSON, got %s", jsonStr)
 	}
-	if !contains(jsonStr, `"note":null`) {
+	if !strings.Contains(jsonStr, `"note":null`) {
 		t.Errorf("expected note:null in JSON, got %s", jsonStr)
 	}
 
@@ -293,15 +271,3 @@ func isErrIndexOutOfRange(err error) bool {
 	return ok
 }
 
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && searchSubstr(s, substr)
-}
-
-func searchSubstr(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
