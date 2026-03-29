@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 )
 
@@ -95,19 +96,8 @@ func TestDocumentJSONRoundTrip(t *testing.T) {
 		t.Fatalf("Unmarshal failed: %v", err)
 	}
 
-	if decoded.ID != original.ID {
-		t.Errorf("ID: got %q, want %q", decoded.ID, original.ID)
-	}
-	if decoded.RawText != original.RawText {
-		t.Errorf("RawText: got %q, want %q", decoded.RawText, original.RawText)
-	}
-	if len(decoded.Sentences) != len(original.Sentences) {
-		t.Fatalf("Sentences length: got %d, want %d", len(decoded.Sentences), len(original.Sentences))
-	}
-	for i := range original.Sentences {
-		if decoded.Sentences[i] != original.Sentences[i] {
-			t.Errorf("Sentences[%d]: got %+v, want %+v", i, decoded.Sentences[i], original.Sentences[i])
-		}
+	if !reflect.DeepEqual(decoded, original) {
+		t.Errorf("round trip failed: got %+v, want %+v", decoded, original)
 	}
 }
 
