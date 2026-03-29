@@ -19,7 +19,7 @@ echo "Watching for queued issues in ${REPO}..."
 while true; do
   # assign-to-claudeラベル付きかつin-progress-by-claude未付与のIssueを検索
   ISSUE=$(gh issue list --repo "$REPO" --label "assign-to-claude" --state open \
-    --json number,title,labels --sort created --order asc \
+    --search "sort:created-asc" --json number,title,labels \
     -q '[.[] | select(.labels | map(.name) | contains(["in-progress-by-claude"]) | not)] | first // empty')
 
   if [ -n "$ISSUE" ]; then
