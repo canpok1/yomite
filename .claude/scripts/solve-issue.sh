@@ -1,64 +1,60 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE_DIR="${WORKSPACE_DIR:-$(cd "${SCRIPT_DIR}/../.." && pwd)}"
-
 # オプション解析
-PRINT_MODE=false
+USE_PRINT_MODE=false
 while getopts "p" opt; do
-  case $opt in
-    p) PRINT_MODE=true ;;
+  case "$opt" in
+    p) USE_PRINT_MODE=true ;;
     *) echo "Usage: $0 [-p] <issue_number>" >&2; exit 1 ;;
   esac
 done
 shift $((OPTIND - 1))
 
-ISSUE_NUMBER="${1:-}"
-if [ -z "$ISSUE_NUMBER" ] || ! [[ "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
+# 引数チェック
+if [ $# -ne 1 ]; then
+  echo "Usage: $0 [-p] <issue_number>" >&2
+  exit 1
+fi
+
+ISSUE_NUMBER="$1"
+if ! [[ "${ISSUE_NUMBER}" =~ ^[0-9]+$ ]]; then
   echo "Error: issue_number must be numeric" >&2
   exit 1
 fi
 
-cd "$WORKSPACE_DIR"
-REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
+SCRIPT_DIR=$(dirname "$0")
+WORKSPACE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# ロックファイル（flockによるアトミックなロック取得）
-LOCK_DIR="${WORKSPACE_DIR}/.tmp/locks"
+# ロックファイル用ディレクトリの準備
+LOCK_DIR="$WORKSPACE_DIR/.tmp/locks"
 mkdir -p "$LOCK_DIR"
-LOCK_FILE="${LOCK_DIR}/issue-${ISSUE_NUMBER}.lock"
 
-exec 200>"$LOCK_FILE"
-if ! flock -n 200; then
-  echo "Issue #${ISSUE_NUMBER} is already being processed by another process." >&2
+REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+
+# ロックを取得（取得できない場合は別プロセスが処理中）
+lock_file="$LOCK_DIR/issue-${ISSUE_NUMBER}.lock"
+exec 9>"$lock_file"
+if ! flock -n 9; then
+  echo "Error: Issue #${ISSUE_NUMBER} is already being processed by another process." >&2
   exit 1
 fi
 
-# クリーンアップ（失敗時のみラベル除去、成功時はsolve-issueスキルがPRでクローズ）
-SOLVE_SUCCESS=false
-cleanup() {
-  flock -u 200 2>/dev/null || true
-  if [ "$SOLVE_SUCCESS" = false ]; then
-    gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --remove-label "in-progress-by-claude" 2>/dev/null || true
-  fi
-}
-trap cleanup EXIT
+echo "Issue #${ISSUE_NUMBER} の処理を開始します"
 
-# ラベル付与
-gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --add-label "in-progress-by-claude"
+# 処理完了後（成否問わず）にラベルを除去
+trap 'gh issue edit --repo "$REPO" "$ISSUE_NUMBER" --remove-label "in-progress-by-claude" || true' EXIT
 
-# メインブランチに切り替え
-git stash --include-untracked 2>/dev/null || true
+# in-progress-by-claudeラベルを付与
+gh issue edit --repo "$REPO" "$ISSUE_NUMBER" --add-label "in-progress-by-claude"
+
+# mainブランチに切り替えて最新化
 git checkout main
 git pull origin main
 
-# Claude実行
-PROMPT="/solve-issue ${ISSUE_NUMBER}"
-if [ "$PRINT_MODE" = true ]; then
-  "${SCRIPT_DIR}/claude-stream.sh" --worktree -p "$PROMPT"
+# Claudeでissueを解決（--worktreeで自動的にブランチとワークツリーを作成）
+if "${USE_PRINT_MODE}"; then
+  "$SCRIPT_DIR/claude-stream.sh" --worktree "issue-${ISSUE_NUMBER}" --dangerously-skip-permissions -p "/solve-issue ${ISSUE_NUMBER}"
 else
-  claude --worktree -p "$PROMPT"
+  claude --worktree "issue-${ISSUE_NUMBER}" --dangerously-skip-permissions "/solve-issue ${ISSUE_NUMBER}"
 fi
-
-SOLVE_SUCCESS=true
-echo "Issue #${ISSUE_NUMBER} processing completed."
