@@ -30,17 +30,15 @@ fi
 echo "=== Step 2: ブランチの更新 ==="
 gh pr update-branch "$PR_NUMBER" --repo "$REPO" 2>/dev/null || {
   echo "Branch update failed. Attempting merge from base branch..."
-  PR_INFO=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefName,baseRefName -q '.headRefName + "\t" + .baseRefName')
-  PR_BRANCH=$(echo "$PR_INFO" | cut -f1)
-  BASE_BRANCH=$(echo "$PR_INFO" | cut -f2)
-  git fetch origin "$BASE_BRANCH" "$PR_BRANCH"
-  git checkout "$PR_BRANCH"
+  BASE_BRANCH=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json baseRefName -q '.baseRefName')
+  gh pr checkout "$PR_NUMBER" --repo "$REPO"
+  git fetch origin "$BASE_BRANCH"
   if ! git merge origin/"$BASE_BRANCH" --no-edit; then
     git merge --abort 2>/dev/null || true
     echo "Merge conflict detected."
     exit 1
   fi
-  git push origin "$PR_BRANCH"
+  git push
 }
 
 echo "=== Step 3: マージ設定の確認 ==="
@@ -68,7 +66,14 @@ echo "=== Step 5: CI完了の待機 ==="
 MAX_POLLS=60
 POLL_INTERVAL=15
 for i in $(seq 1 $MAX_POLLS); do
-  STATUS=$(gh pr checks "$PR_NUMBER" --repo "$REPO" --json state -q '[.[].state] | if all(. == "SUCCESS" or . == "SKIPPED") then "success" elif any(. == "FAILURE") then "failure" elif any(. == "PENDING" or . == "QUEUED") then "pending" else "unknown" end' 2>/dev/null || echo "pending")
+  STATUS=$(gh pr checks "$PR_NUMBER" --repo "$REPO" --json state -q '
+    [.[].state] as $s
+    | if (($s | length) > 0) and ($s | all(. == "SUCCESS" or . == "SKIPPED")) then "success"
+      elif ($s | any(. == "FAILURE")) then "failure"
+      elif ($s | any(. == "PENDING" or . == "QUEUED")) then "pending"
+      else "unknown"
+      end
+  ' 2>/dev/null || echo "pending")
 
   case "$STATUS" in
     success)
