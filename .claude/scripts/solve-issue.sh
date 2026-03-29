@@ -20,24 +20,24 @@ if [ -z "$ISSUE_NUMBER" ] || ! [[ "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
+cd "$WORKSPACE_DIR"
 REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 
-# ロックファイル
+# ロックファイル（flockによるアトミックなロック取得）
 LOCK_DIR="${WORKSPACE_DIR}/.tmp/locks"
 mkdir -p "$LOCK_DIR"
 LOCK_FILE="${LOCK_DIR}/issue-${ISSUE_NUMBER}.lock"
 
-if [ -f "$LOCK_FILE" ]; then
+exec 200>"$LOCK_FILE"
+if ! flock -n 200; then
   echo "Issue #${ISSUE_NUMBER} is already being processed by another process." >&2
   exit 1
 fi
 
-touch "$LOCK_FILE"
-
 # クリーンアップ（失敗時のみラベル除去、成功時はsolve-issueスキルがPRでクローズ）
 SOLVE_SUCCESS=false
 cleanup() {
-  rm -f "$LOCK_FILE"
+  flock -u 200 2>/dev/null || true
   if [ "$SOLVE_SUCCESS" = false ]; then
     gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --remove-label "in-progress-by-claude" 2>/dev/null || true
   fi
@@ -48,7 +48,6 @@ trap cleanup EXIT
 gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --add-label "in-progress-by-claude"
 
 # メインブランチに切り替え
-cd "$WORKSPACE_DIR"
 git stash --include-untracked 2>/dev/null || true
 git checkout main
 git pull origin main

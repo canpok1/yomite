@@ -5,7 +5,7 @@
 INPUT=$(cat)
 
 # 全ての値を一度のjq呼び出しで抽出
-read -r model context_size current_usage cost input_tokens output_tokens < <(
+IFS=$'\t' read -r model context_size current_usage cost input_tokens output_tokens < <(
   echo "$INPUT" | jq -r '[
     .model // "",
     .contextWindow.totalSize // 0,

@@ -29,11 +29,13 @@ fi
 
 echo "=== Step 2: ブランチの更新 ==="
 gh pr update-branch "$PR_NUMBER" --repo "$REPO" 2>/dev/null || {
-  echo "Branch update failed. Attempting merge from main..."
-  PR_BRANCH=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefName -q '.headRefName')
-  git fetch origin main "$PR_BRANCH"
+  echo "Branch update failed. Attempting merge from base branch..."
+  PR_INFO=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefName,baseRefName -q '.headRefName + "\t" + .baseRefName')
+  PR_BRANCH=$(echo "$PR_INFO" | cut -f1)
+  BASE_BRANCH=$(echo "$PR_INFO" | cut -f2)
+  git fetch origin "$BASE_BRANCH" "$PR_BRANCH"
   git checkout "$PR_BRANCH"
-  if ! git merge origin/main --no-edit; then
+  if ! git merge origin/"$BASE_BRANCH" --no-edit; then
     git merge --abort 2>/dev/null || true
     echo "Merge conflict detected."
     exit 1
@@ -58,7 +60,8 @@ fi
 if [ -n "$PREFERRED_METHOD" ]; then
   gh pr merge "$PR_NUMBER" --repo "$REPO" --auto --"$PREFERRED_METHOD" 2>/dev/null || true
 else
-  echo "Warning: No merge method is enabled for this repository."
+  echo "No merge method is enabled for this repository." >&2
+  exit 1
 fi
 
 echo "=== Step 5: CI完了の待機 ==="
@@ -96,27 +99,41 @@ if [ "$MERGED" = "true" ]; then
 fi
 
 echo "=== Step 7: ブロッカーの確認 ==="
-# 未解決のレビュースレッドを確認
-UNRESOLVED=$(gh api graphql -f query='
-  query($owner: String!, $name: String!, $number: Int!) {
-    repository(owner: $owner, name: $name) {
-      pullRequest(number: $number) {
-        reviewThreads(first: 100) {
-          nodes {
-            isResolved
-            comments(first: 1) {
-              nodes {
-                author { login }
-                body
+# 未解決のレビュースレッドを確認（ページネーション対応）
+UNRESOLVED=0
+HAS_NEXT=true
+CURSOR=""
+while [ "$HAS_NEXT" = "true" ]; do
+  AFTER_ARG=""
+  if [ -n "$CURSOR" ]; then
+    AFTER_ARG="-f cursor=$CURSOR"
+  fi
+  RESULT=$(gh api graphql -f query='
+    query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) {
+          reviewThreads(first: 100, after: $cursor) {
+            pageInfo { hasNextPage endCursor }
+            nodes {
+              isResolved
+              comments(first: 1) {
+                nodes {
+                  author { login }
+                  body
+                }
               }
             }
           }
         }
       }
     }
-  }
-' -f owner="${REPO%%/*}" -f name="${REPO##*/}" -F number="$PR_NUMBER" \
-  --jq '.data.repository.pullRequest.reviewThreads.nodes | map(select(.isResolved == false)) | length')
+  ' -f owner="${REPO%%/*}" -f name="${REPO##*/}" -F number="$PR_NUMBER" $AFTER_ARG)
+
+  PAGE_UNRESOLVED=$(echo "$RESULT" | jq '.data.repository.pullRequest.reviewThreads.nodes | map(select(.isResolved == false)) | length')
+  UNRESOLVED=$((UNRESOLVED + PAGE_UNRESOLVED))
+  HAS_NEXT=$(echo "$RESULT" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage')
+  CURSOR=$(echo "$RESULT" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor // empty')
+done
 
 if [ "$UNRESOLVED" -gt 0 ]; then
   echo "${UNRESOLVED} unresolved review thread(s) found."
@@ -125,14 +142,14 @@ fi
 
 # 承認の確認
 # reviewDecisionが空の場合はレビュー不要の設定と判断し、マージを許可する
-REVIEW_DECISION=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json reviewDecision -q '.reviewDecision')
+REVIEW_DECISION=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json reviewDecision -q '.reviewDecision // empty')
 if [ "$REVIEW_DECISION" != "APPROVED" ] && [ -n "$REVIEW_DECISION" ]; then
   echo "PR is not approved. Review decision: ${REVIEW_DECISION}"
   exit 30
 fi
 
 echo "=== Step 8: マージ実行 ==="
-gh pr merge "$PR_NUMBER" --repo "$REPO" --"${PREFERRED_METHOD:-squash}" --delete-branch || {
+gh pr merge "$PR_NUMBER" --repo "$REPO" --"$PREFERRED_METHOD" --delete-branch || {
   echo "Merge failed."
   exit 1
 }
