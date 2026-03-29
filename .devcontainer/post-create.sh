@@ -3,8 +3,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# tmux設定のリンク
 ln -sf "${SCRIPT_DIR}/.tmux.conf" "${HOME}/.tmux.conf"
+
+curl -fsSL https://claude.ai/install.sh | bash
 
 # .envテンプレートのコピー
 if [ ! -f "${SCRIPT_DIR}/.env" ]; then
