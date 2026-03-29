@@ -12,7 +12,7 @@ func TestConfigJSONRoundTrip(t *testing.T) {
 	original := Config{
 		DefaultProvider: "local_ollama",
 		DefaultPersona:  "beginner",
-		Providers: map[string]Provider{
+		Providers: map[string]ProviderConfig{
 			"local_ollama": {
 				Type:   "ollama",
 				Model:  "gemma2",
@@ -107,7 +107,7 @@ func TestLoadConfig_ExplicitPathNotFound(t *testing.T) {
 func TestLoadConfig_LocalOnly(t *testing.T) {
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "yomite.json")
-	writeTestConfig(t, localPath, "local_only", "persona_a", map[string]Provider{
+	writeTestConfig(t, localPath, "local_only", "persona_a", map[string]ProviderConfig{
 		"local_only": {Type: "ollama", Model: "gemma2"},
 	}, map[string]Persona{
 		"persona_a": {DisplayName: "A", SystemPrompt: "a", MemoryCapacity: 100, MaxSteps: 10},
@@ -125,7 +125,7 @@ func TestLoadConfig_LocalOnly(t *testing.T) {
 func TestLoadConfig_GlobalOnly(t *testing.T) {
 	dir := t.TempDir()
 	globalPath := filepath.Join(dir, "config.json")
-	writeTestConfig(t, globalPath, "global_only", "persona_b", map[string]Provider{
+	writeTestConfig(t, globalPath, "global_only", "persona_b", map[string]ProviderConfig{
 		"global_only": {Type: "ollama", Model: "llama3"},
 	}, map[string]Persona{
 		"persona_b": {DisplayName: "B", SystemPrompt: "b", MemoryCapacity: 200, MaxSteps: 20},
@@ -146,14 +146,14 @@ func TestLoadConfig_MergeBothExist(t *testing.T) {
 	globalPath := filepath.Join(dir, "config.json")
 
 	// グローバル: provider=global_p, persona=global_persona
-	writeTestConfig(t, globalPath, "global_p", "global_persona", map[string]Provider{
+	writeTestConfig(t, globalPath, "global_p", "global_persona", map[string]ProviderConfig{
 		"global_p": {Type: "ollama", Model: "gemma2", Origin: "http://remote:11434"},
 	}, map[string]Persona{
 		"global_persona": {DisplayName: "Global", SystemPrompt: "global", MemoryCapacity: 100, MaxSteps: 10},
 	})
 
 	// ローカル: provider=local_p, persona=local_persona（上書き）
-	writeTestConfig(t, localPath, "local_p", "local_persona", map[string]Provider{
+	writeTestConfig(t, localPath, "local_p", "local_persona", map[string]ProviderConfig{
 		"local_p": {Type: "ollama", Model: "llama3"},
 	}, map[string]Persona{
 		"local_persona": {DisplayName: "Local", SystemPrompt: "local", MemoryCapacity: 300, MaxSteps: 30},
@@ -222,7 +222,7 @@ func TestLoadConfig_NeitherExists(t *testing.T) {
 func TestValidate_InvalidDefaultProvider(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")
-	writeTestConfig(t, configPath, "nonexistent", "test", map[string]Provider{
+	writeTestConfig(t, configPath, "nonexistent", "test", map[string]ProviderConfig{
 		"local": {Type: "ollama", Model: "gemma2"},
 	}, map[string]Persona{
 		"test": {DisplayName: "T", SystemPrompt: "t", MemoryCapacity: 100, MaxSteps: 10},
@@ -237,7 +237,7 @@ func TestValidate_InvalidDefaultProvider(t *testing.T) {
 func TestValidate_InvalidDefaultPersona(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")
-	writeTestConfig(t, configPath, "local", "nonexistent", map[string]Provider{
+	writeTestConfig(t, configPath, "local", "nonexistent", map[string]ProviderConfig{
 		"local": {Type: "ollama", Model: "gemma2"},
 	}, map[string]Persona{
 		"test": {DisplayName: "T", SystemPrompt: "t", MemoryCapacity: 100, MaxSteps: 10},
@@ -250,7 +250,7 @@ func TestValidate_InvalidDefaultPersona(t *testing.T) {
 }
 
 // writeTestConfig はテスト用の設定ファイルを書き出すヘルパー。
-func writeTestConfig(t *testing.T, path, defaultProvider, defaultPersona string, providers map[string]Provider, personas map[string]Persona) {
+func writeTestConfig(t *testing.T, path, defaultProvider, defaultPersona string, providers map[string]ProviderConfig, personas map[string]Persona) {
 	t.Helper()
 	cfg := Config{
 		DefaultProvider: defaultProvider,
