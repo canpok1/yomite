@@ -29,13 +29,14 @@
       ]
     }
   },
+  "containerEnv": {
+    "WORKSPACE_DIR": "${containerWorkspaceFolder}"
+  },
+  "initializeCommand": "test -f .devcontainer/.env || cp .devcontainer/.env-template .devcontainer/.env",
   "runArgs": [
     "--env-file",
     ".devcontainer/.env"
   ],
-  "containerEnv": {
-    "WORKSPACE_DIR": "${containerWorkspaceFolder}"
-  },
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "waitFor": "postCreateCommand"
 }

@@ -20,6 +20,11 @@ if [ -z "$PR_NUMBER" ] || ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
+if ! [[ "$WAIT_SECONDS" =~ ^-?[0-9]+$ ]]; then
+  echo "Error: WAIT_SECONDS must be numeric" >&2
+  exit 1
+fi
+
 REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 CODERABBIT_USER="coderabbitai"
 

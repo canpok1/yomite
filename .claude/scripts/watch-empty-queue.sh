@@ -15,18 +15,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# ロックファイルによる多重起動防止
+# ロックファイルによる多重起動防止（flockでアトミックなロック取得）
 LOCK_FILE="/tmp/watch-empty-queue.lock"
-if [ -f "$LOCK_FILE" ]; then
+exec 200>"$LOCK_FILE"
+if ! flock -n 200; then
   echo "Already running."
   exit 1
 fi
-touch "$LOCK_FILE"
-
-cleanup() {
-  rm -f "$LOCK_FILE"
-}
-trap cleanup EXIT
 
 # シグナルハンドリング
 shutdown() {
@@ -36,7 +31,6 @@ shutdown() {
 }
 trap shutdown SIGINT
 
-ME=$(gh api user -q '.login')
 REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 
 echo "Watching for empty queue in ${REPO} (min_queue: ${MIN_QUEUE}, assign_count: ${ASSIGN_COUNT})..."

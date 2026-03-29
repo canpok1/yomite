@@ -7,7 +7,7 @@
 
 Issue やPR を作成する際は、末尾に以下のフッターを付与すること。
 
-```
+```text
 🤖 Generated with [Claude Code](https://claude.ai/code)
 ```
 

@@ -38,23 +38,46 @@ case "${ARCH}" in
     ;;
 esac
 
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+# macOSはリリースアセット名が異なる（darwin→macOS、.tar.gz→.zip）
+RAW_OS=$(uname -s)
+case "${RAW_OS}" in
+  Linux)
+    OS="linux"
+    ARCHIVE_EXT="tar.gz"
+    ;;
+  Darwin)
+    OS="macOS"
+    ARCHIVE_EXT="zip"
+    ;;
+  *)
+    echo "Error: Unsupported OS: ${RAW_OS}" >&2
+    exit 1
+    ;;
+esac
 
-URL="https://github.com/cli/cli/releases/download/v${VERSION}/gh_${VERSION}_${OS}_${ARCH}.tar.gz"
+ARCHIVE_NAME="gh_${VERSION}_${OS}_${ARCH}.${ARCHIVE_EXT}"
+URL="https://github.com/cli/cli/releases/download/v${VERSION}/${ARCHIVE_NAME}"
 
 echo "Downloading gh ${VERSION} for ${OS}/${ARCH}..."
 
 TEMP_DIR=$(mktemp -d)
 
 cd "${TEMP_DIR}"
-if ! curl -fsSL "${URL}" -o gh.tar.gz; then
+if ! curl -fsSL "${URL}" -o "${ARCHIVE_NAME}"; then
   echo "Error: Failed to download from ${URL}" >&2
   exit 1
 fi
 
-if ! tar -xzf gh.tar.gz; then
-  echo "Error: Failed to extract gh.tar.gz" >&2
-  exit 1
+if [[ "${ARCHIVE_EXT}" == "zip" ]]; then
+  if ! unzip -q "${ARCHIVE_NAME}"; then
+    echo "Error: Failed to extract ${ARCHIVE_NAME}" >&2
+    exit 1
+  fi
+else
+  if ! tar -xzf "${ARCHIVE_NAME}"; then
+    echo "Error: Failed to extract ${ARCHIVE_NAME}" >&2
+    exit 1
+  fi
 fi
 
 GH_BINARY="gh_${VERSION}_${OS}_${ARCH}/bin/gh"
@@ -79,6 +102,8 @@ if [[ -n "${CLAUDE_ENV_FILE:-}" ]]; then
     echo "export PATH=\"${INSTALL_DIR}:\${PATH}\"" >> "${CLAUDE_ENV_FILE}"
     echo "PATH setting persisted to ${CLAUDE_ENV_FILE}"
   fi
+else
+  echo "Warning: CLAUDE_ENV_FILE is not set. PATH will not be persisted across sessions." >&2
 fi
 
 if [[ -n "${GH_TOKEN:-}" ]] || [[ -n "${GITHUB_TOKEN:-}" ]]; then

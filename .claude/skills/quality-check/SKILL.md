@@ -33,7 +33,7 @@ linterでチェック不可能な項目に特化する：
 
 ## 使用方法
 
-```
+```text
 /quality-check HEAD          # 最新コミット
 /quality-check abc123        # 特定コミット
 /quality-check #123          # PR番号

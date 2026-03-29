@@ -21,7 +21,7 @@ user-invocable: true
 
 変更された `.md` ファイル内の相対パスリンクを検証する：
 
-1. `git diff --name-only HEAD` で変更された `.md` ファイルを抽出
+1. `git diff --name-only origin/main...HEAD` で変更された `.md` ファイルを抽出
 2. コードブロック外の `[text](path)` 形式のリンクを解析
 3. 相対パスを解決し、対象ファイルの存在を確認（URLやフラグメントのみのリンクは除外）
 4. 壊れたリンクを報告・修正

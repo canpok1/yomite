@@ -46,15 +46,20 @@ MERGE_METHODS=$(gh api "repos/${REPO}" --jq '{squash: .allow_squash_merge, merge
 echo "Available merge methods: ${MERGE_METHODS}"
 
 echo "=== Step 4: auto-mergeの有効化 ==="
-PREFERRED_METHOD="SQUASH"
-if echo "$MERGE_METHODS" | jq -e '.squash' > /dev/null 2>&1; then
-  PREFERRED_METHOD="SQUASH"
-elif echo "$MERGE_METHODS" | jq -e '.merge' > /dev/null 2>&1; then
-  PREFERRED_METHOD="MERGE"
-elif echo "$MERGE_METHODS" | jq -e '.rebase' > /dev/null 2>&1; then
-  PREFERRED_METHOD="REBASE"
+PREFERRED_METHOD=""
+if echo "$MERGE_METHODS" | jq -e '.squash == true' > /dev/null 2>&1; then
+  PREFERRED_METHOD="squash"
+elif echo "$MERGE_METHODS" | jq -e '.merge == true' > /dev/null 2>&1; then
+  PREFERRED_METHOD="merge"
+elif echo "$MERGE_METHODS" | jq -e '.rebase == true' > /dev/null 2>&1; then
+  PREFERRED_METHOD="rebase"
 fi
-gh pr merge "$PR_NUMBER" --repo "$REPO" --auto --"$(echo "$PREFERRED_METHOD" | tr '[:upper:]' '[:lower:]')" 2>/dev/null || true
+
+if [ -n "$PREFERRED_METHOD" ]; then
+  gh pr merge "$PR_NUMBER" --repo "$REPO" --auto --"$PREFERRED_METHOD" 2>/dev/null || true
+else
+  echo "Warning: No merge method is enabled for this repository."
+fi
 
 echo "=== Step 5: CI完了の待機 ==="
 MAX_POLLS=60
@@ -119,6 +124,7 @@ if [ "$UNRESOLVED" -gt 0 ]; then
 fi
 
 # 承認の確認
+# reviewDecisionが空の場合はレビュー不要の設定と判断し、マージを許可する
 REVIEW_DECISION=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json reviewDecision -q '.reviewDecision')
 if [ "$REVIEW_DECISION" != "APPROVED" ] && [ -n "$REVIEW_DECISION" ]; then
   echo "PR is not approved. Review decision: ${REVIEW_DECISION}"
@@ -126,7 +132,7 @@ if [ "$REVIEW_DECISION" != "APPROVED" ] && [ -n "$REVIEW_DECISION" ]; then
 fi
 
 echo "=== Step 8: マージ実行 ==="
-gh pr merge "$PR_NUMBER" --repo "$REPO" --"$(echo "$PREFERRED_METHOD" | tr '[:upper:]' '[:lower:]')" --delete-branch || {
+gh pr merge "$PR_NUMBER" --repo "$REPO" --"${PREFERRED_METHOD:-squash}" --delete-branch || {
   echo "Merge failed."
   exit 1
 }

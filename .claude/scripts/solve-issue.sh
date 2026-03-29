@@ -34,10 +34,13 @@ fi
 
 touch "$LOCK_FILE"
 
-# クリーンアップ
+# クリーンアップ（失敗時のみラベル除去、成功時はsolve-issueスキルがPRでクローズ）
+SOLVE_SUCCESS=false
 cleanup() {
   rm -f "$LOCK_FILE"
-  gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --remove-label "in-progress-by-claude" 2>/dev/null || true
+  if [ "$SOLVE_SUCCESS" = false ]; then
+    gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --remove-label "in-progress-by-claude" 2>/dev/null || true
+  fi
 }
 trap cleanup EXIT
 
@@ -46,6 +49,7 @@ gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --add-label "in-progress-by-claude"
 
 # メインブランチに切り替え
 cd "$WORKSPACE_DIR"
+git stash --include-untracked 2>/dev/null || true
 git checkout main
 git pull origin main
 
@@ -57,4 +61,5 @@ else
   claude --worktree -p "$PROMPT"
 fi
 
+SOLVE_SUCCESS=true
 echo "Issue #${ISSUE_NUMBER} processing completed."

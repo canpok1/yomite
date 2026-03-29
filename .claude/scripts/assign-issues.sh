@@ -19,11 +19,10 @@ if ! [[ "$ASSIGN_COUNT" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
-ME=$(gh api user -q '.login')
 REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
 
 # readyラベル付きかつ割り当て済みラベルなしのIssue数を確認し、0件ならスキップ
-READY_COUNT=$(gh issue list --repo "$REPO" --label "ready" --state open --json number \
+READY_COUNT=$(gh issue list --repo "$REPO" --label "ready" --state open --json number,labels \
   -q '[.[] | select(.labels | map(.name) | (contains(["assign-to-claude"]) | not) and (contains(["in-progress-by-claude"]) | not))] | length')
 
 if [ "$READY_COUNT" -eq 0 ]; then

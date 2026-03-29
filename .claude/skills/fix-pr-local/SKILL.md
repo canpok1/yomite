@@ -23,7 +23,7 @@ PRのCI、レビュー対応、マージを自動化します。
 - **Exit 10**: CI失敗。ログを分析してコード修正を行う。
 - **Exit 20**: 未解決のレビュースレッドがある。GraphQLで全スレッドを取得し、コード修正またはコメント返信で対応する。
 - **Exit 30**: 承認待ち。CIが通りスレッドも解決済みだが、承認がない。
-  - CodeRabbitのレート制限コメントがある場合は `handle-coderabbit-rate-limit.sh` を実行する。
+  - CodeRabbitのレート制限コメントがある場合は `handle-coderabbit-rate-limit.sh <PR_NUMBER> <WAIT_SECONDS>` を実行する。
   - それ以外は、コメント者（リポジトリオーナー除く）に承認をリクエストする。
 
 ## 重要な制約

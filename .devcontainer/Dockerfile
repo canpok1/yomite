@@ -2,7 +2,8 @@ FROM mcr.microsoft.com/devcontainers/base:noble
 
 ENV CLAUDE_CONFIG_DIR=/home/vscode/.claude
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    jq \
     tmux \
     shellcheck \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -13,4 +14,4 @@ USER vscode
 
 RUN mkdir -p ${CLAUDE_CONFIG_DIR} && chmod 700 ${CLAUDE_CONFIG_DIR}
 
-RUN curl -fsSL https://claude.ai/install.sh | sh
+RUN npm install -g @anthropic-ai/claude-code

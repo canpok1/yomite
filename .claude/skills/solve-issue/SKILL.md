@@ -46,7 +46,7 @@ Issueがオープンであることを確認する。CLOSEDの場合は終了す
 - Go: `gofmt`, `golangci-lint run`
 - Shell: `shellcheck`
 
-### Step 5: ���複PRチェック
+### Step 5: 重複PRチェック
 
 既存のPRと重複しないことを確認する。
 

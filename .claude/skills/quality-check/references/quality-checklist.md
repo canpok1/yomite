@@ -1,3 +1,3 @@
 # 品質チェックリスト
 
-詳細は [`docs/rules/quality-checklist.md`](../../../../docs/rules/quality-checklist.md) を参照してください。
+> **TODO**: 詳細な品質チェックリストは `docs/rules/quality-checklist.md` に作成予定。

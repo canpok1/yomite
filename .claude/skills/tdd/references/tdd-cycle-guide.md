@@ -1,3 +1,3 @@
 # TDDサイクルガイド
 
-詳細は [`docs/rules/tdd-guide.md`](../../../../docs/rules/tdd-guide.md) を参照してください。
+> **TODO**: 詳細なTDDサイクルガイドは `docs/rules/tdd-guide.md` に作成予定。
