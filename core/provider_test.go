@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -95,6 +96,93 @@ func TestSimulationResponseJSONRoundTripNil(t *testing.T) {
 	}
 	if got.Note != nil {
 		t.Errorf("Note: got %+v, want nil", got.Note)
+	}
+}
+
+func TestBuildPromptSystemPrompt(t *testing.T) {
+	req := SimulationRequest{
+		SystemPrompt:    "あなたは初学者の読者です。",
+		CurrentSentence: "テスト文。",
+		CurrentIndex:    0,
+		TotalSentences:  5,
+		Memory:          "",
+	}
+
+	system, _ := BuildPrompt(req)
+
+	if !strings.Contains(system, req.SystemPrompt) {
+		t.Errorf("system prompt should contain persona prompt, got %q", system)
+	}
+}
+
+func TestBuildPromptUserMessageContainsJSONFormat(t *testing.T) {
+	req := SimulationRequest{
+		SystemPrompt:    "あなたは初学者の読者です。",
+		CurrentSentence: "テスト文。",
+		CurrentIndex:    0,
+		TotalSentences:  5,
+		Memory:          "",
+	}
+
+	_, user := BuildPrompt(req)
+
+	// JSONフォーマット指示が含まれることを確認
+	if !strings.Contains(user, "current_index") {
+		t.Error("user message should contain current_index field instruction")
+	}
+	if !strings.Contains(user, "next_index") {
+		t.Error("user message should contain next_index field instruction")
+	}
+	if !strings.Contains(user, "note") {
+		t.Error("user message should contain note field instruction")
+	}
+	if !strings.Contains(user, "memory") {
+		t.Error("user message should contain memory field instruction")
+	}
+	if !strings.Contains(user, "JSON") {
+		t.Error("user message should mention JSON format")
+	}
+}
+
+func TestBuildPromptUserMessageContainsContext(t *testing.T) {
+	req := SimulationRequest{
+		SystemPrompt:    "あなたは初学者の読者です。",
+		CurrentSentence: "これはテスト文です。",
+		CurrentIndex:    2,
+		TotalSentences:  10,
+		Memory:          "前の文で重要な概念が出た。",
+	}
+
+	_, user := BuildPrompt(req)
+
+	if !strings.Contains(user, req.CurrentSentence) {
+		t.Error("user message should contain current sentence")
+	}
+	if !strings.Contains(user, "2") {
+		t.Error("user message should contain current index")
+	}
+	if !strings.Contains(user, "10") {
+		t.Error("user message should contain total sentences")
+	}
+	if !strings.Contains(user, req.Memory) {
+		t.Error("user message should contain memory")
+	}
+}
+
+func TestBuildPromptEmptyMemory(t *testing.T) {
+	req := SimulationRequest{
+		SystemPrompt:    "あなたは初学者の読者です。",
+		CurrentSentence: "テスト文。",
+		CurrentIndex:    0,
+		TotalSentences:  5,
+		Memory:          "",
+	}
+
+	_, user := BuildPrompt(req)
+
+	// 空の記憶でもエラーなくプロンプトが生成されることを確認
+	if user == "" {
+		t.Error("user message should not be empty even with empty memory")
 	}
 }
 
