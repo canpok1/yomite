@@ -67,7 +67,7 @@ func (p *OllamaProvider) Execute(req SimulationRequest) (SimulationResponse, err
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
 		return SimulationResponse{}, fmt.Errorf("ollama returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 

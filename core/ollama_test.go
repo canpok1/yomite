@@ -10,15 +10,20 @@ import (
 	"testing"
 )
 
-// テストリスト:
-// DONE: NewOllamaProvider がorigin, modelを保持する
-// DONE: OllamaProvider が Provider インターフェースを実装する
-// DONE: 正常なレスポンスでSimulationResponseを返す
-// DONE: リクエストボディが正しい形式で送信される（model, system, user message）
-// DONE: HTTP非200レスポンスでエラーを返す
-// DONE: 接続拒否でエラーを返す
-// DONE: レスポンスのJSONパースエラーでエラーを返す
-// DONE: LLM出力のSimulationResponseパースエラーでエラーを返す
+// newOllamaChatServer はテスト用のOllama /api/chat サーバーを返す。
+// content にはLLMの出力テキストを指定する。
+func newOllamaChatServer(content string) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		resp := map[string]interface{}{
+			"message": map[string]interface{}{
+				"role":    "assistant",
+				"content": content,
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+}
 
 func TestNewOllamaProvider(t *testing.T) {
 	origin := "http://localhost:11434"
@@ -48,16 +53,7 @@ func TestOllamaProvider_Execute_Success(t *testing.T) {
 	}
 	simRespJSON, _ := json.Marshal(simResp)
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		resp := map[string]interface{}{
-			"message": map[string]interface{}{
-				"role":    "assistant",
-				"content": string(simRespJSON),
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
-	}))
+	server := newOllamaChatServer(string(simRespJSON))
 	defer server.Close()
 
 	p := NewOllamaProvider(server.URL, "gemma2")
@@ -102,6 +98,7 @@ func TestOllamaProvider_Execute_RequestFormat(t *testing.T) {
 		nextIdx := 1
 		simResp := SimulationResponse{CurrentIndex: 0, NextIndex: &nextIdx, Memory: "mem"}
 		simRespJSON, _ := json.Marshal(simResp)
+
 		resp := map[string]interface{}{
 			"message": map[string]interface{}{
 				"role":    "assistant",
@@ -211,16 +208,7 @@ func TestOllamaProvider_Execute_InvalidOllamaJSON(t *testing.T) {
 }
 
 func TestOllamaProvider_Execute_InvalidSimulationResponseJSON(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		resp := map[string]interface{}{
-			"message": map[string]interface{}{
-				"role":    "assistant",
-				"content": "これはJSONではありません",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
-	}))
+	server := newOllamaChatServer("これはJSONではありません")
 	defer server.Close()
 
 	p := NewOllamaProvider(server.URL, "gemma2")
