@@ -1,8 +1,9 @@
 {
   "name": "Ubuntu",
-  "build": {
-    "dockerfile": "Dockerfile"
-  },
+  "dockerComposeFile": "compose.yml",
+  "service": "dev",
+  "runServices": ["ollama"],
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers/features/go:1": {},
@@ -33,10 +34,6 @@
     "WORKSPACE_DIR": "${containerWorkspaceFolder}"
   },
   "initializeCommand": "test -f .devcontainer/.env || cp .devcontainer/.env-template .devcontainer/.env",
-  "runArgs": [
-    "--env-file",
-    ".devcontainer/.env"
-  ],
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "waitFor": "postCreateCommand"
 }
