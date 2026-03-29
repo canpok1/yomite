@@ -12,10 +12,10 @@ const defaultOrigin = "http://localhost:11434"
 
 // Config はアプリケーション全体の設定を保持する。
 type Config struct {
-	DefaultProvider string              `json:"default_provider"`
-	DefaultPersona  string              `json:"default_persona"`
+	DefaultProvider string                    `json:"default_provider"`
+	DefaultPersona  string                    `json:"default_persona"`
 	Providers       map[string]ProviderConfig `json:"providers"`
-	Personas        map[string]Persona  `json:"personas"`
+	Personas        map[string]Persona        `json:"personas"`
 }
 
 // ProviderConfig はLLMプロバイダの接続情報を表す。
