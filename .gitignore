@@ -30,6 +30,9 @@ yomite
 # env file
 .env
 
+# Temporary files
+.tmp/
+
 # Editor/IDE
 # .idea/
 # .vscode/
