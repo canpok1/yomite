@@ -18,7 +18,16 @@ if [ -z "$PR_NUMBER" ] || ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
-REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
+# リポジトリ名を git remote URL から取得（--repo フラグで使用する）
+REMOTE_URL=$(git remote get-url origin 2>/dev/null || true)
+if [[ "$REMOTE_URL" =~ github\.com[:/]([^/]+/[^/.]+) ]]; then
+  REPO="${BASH_REMATCH[1]}"
+  REPO="${REPO%.git}"
+else
+  echo "ERROR: origin の remote URL から GitHub リポジトリを特定できません。" >&2
+  echo "URL: ${REMOTE_URL:-<not set>}" >&2
+  exit 1
+fi
 
 echo "=== Step 1: マージ状態の確認 ==="
 MERGED=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json merged -q '.merged')
