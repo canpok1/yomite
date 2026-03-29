@@ -64,11 +64,11 @@ func (p *OllamaProvider) Execute(req SimulationRequest) (SimulationResponse, err
 	if err != nil {
 		return SimulationResponse{}, fmt.Errorf("failed to send request to Ollama: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		return SimulationResponse{}, fmt.Errorf("Ollama returned status %d: %s", resp.StatusCode, string(respBody))
+		return SimulationResponse{}, fmt.Errorf("ollama returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	var chatResp ollamaChatResponse

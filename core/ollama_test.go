@@ -2,19 +2,19 @@ package core
 
 import (
 	"encoding/json"
-	"io"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
 
-// テストリスト（シンプル→複雑の順）:
+// テストリスト:
 // DONE: NewOllamaProvider がorigin, modelを保持する
-// TODO: OllamaProvider が Provider インターフェースを実装する
-// TODO: 正常なレスポンスでSimulationResponseを返す
-// TODO: リクエストボディが正しい形式で送信される（model, system, user message）
+// DONE: OllamaProvider が Provider インターフェースを実装する
+// DONE: 正常なレスポンスでSimulationResponseを返す
+// DONE: リクエストボディが正しい形式で送信される（model, system, user message）
 // DONE: HTTP非200レスポンスでエラーを返す
 // DONE: 接続拒否でエラーを返す
 // DONE: レスポンスのJSONパースエラーでエラーを返す
@@ -39,7 +39,6 @@ func TestOllamaProvider_ImplementsProvider(t *testing.T) {
 }
 
 func TestOllamaProvider_Execute_Success(t *testing.T) {
-	// Ollama /api/chat の正常レスポンス
 	nextIdx := 1
 	simResp := SimulationResponse{
 		CurrentIndex: 0,
@@ -49,7 +48,7 @@ func TestOllamaProvider_Execute_Success(t *testing.T) {
 	}
 	simRespJSON, _ := json.Marshal(simResp)
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		resp := map[string]interface{}{
 			"message": map[string]interface{}{
 				"role":    "assistant",
@@ -57,7 +56,7 @@ func TestOllamaProvider_Execute_Success(t *testing.T) {
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -90,7 +89,6 @@ func TestOllamaProvider_Execute_RequestFormat(t *testing.T) {
 	var receivedBody map[string]interface{}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// リクエストの検証
 		if r.Method != http.MethodPost {
 			t.Errorf("Method: got %s, want POST", r.Method)
 		}
@@ -99,9 +97,8 @@ func TestOllamaProvider_Execute_RequestFormat(t *testing.T) {
 		}
 
 		body, _ := io.ReadAll(r.Body)
-		json.Unmarshal(body, &receivedBody)
+		_ = json.Unmarshal(body, &receivedBody)
 
-		// 正常レスポンスを返す
 		nextIdx := 1
 		simResp := SimulationResponse{CurrentIndex: 0, NextIndex: &nextIdx, Memory: "mem"}
 		simRespJSON, _ := json.Marshal(simResp)
@@ -112,7 +109,7 @@ func TestOllamaProvider_Execute_RequestFormat(t *testing.T) {
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -125,31 +122,26 @@ func TestOllamaProvider_Execute_RequestFormat(t *testing.T) {
 		Memory:          "記憶",
 	}
 
-	p.Execute(req)
+	_, _ = p.Execute(req)
 
-	// model の検証
 	if model, ok := receivedBody["model"].(string); !ok || model != "gemma2" {
 		t.Errorf("model: got %v, want %q", receivedBody["model"], "gemma2")
 	}
 
-	// stream: false の検証
-	if stream, ok := receivedBody["stream"].(bool); !ok || stream != false {
+	if stream, ok := receivedBody["stream"].(bool); !ok || stream {
 		t.Errorf("stream: got %v, want false", receivedBody["stream"])
 	}
 
-	// messages の検証
 	messages, ok := receivedBody["messages"].([]interface{})
 	if !ok || len(messages) != 2 {
 		t.Fatalf("messages: got %v, want 2 messages", receivedBody["messages"])
 	}
 
-	// system message
 	sysMsg := messages[0].(map[string]interface{})
 	if sysMsg["role"] != "system" {
 		t.Errorf("messages[0].role: got %v, want system", sysMsg["role"])
 	}
 
-	// user message
 	userMsg := messages[1].(map[string]interface{})
 	if userMsg["role"] != "user" {
 		t.Errorf("messages[1].role: got %v, want user", userMsg["role"])
@@ -164,9 +156,9 @@ func TestOllamaProvider_Execute_Non200Status(t *testing.T) {
 
 	p := NewOllamaProvider(server.URL, "nonexistent")
 	req := SimulationRequest{
-		SystemPrompt:   "test",
+		SystemPrompt:    "test",
 		CurrentSentence: "test",
-		TotalSentences: 1,
+		TotalSentences:  1,
 	}
 
 	_, err := p.Execute(req)
@@ -179,12 +171,11 @@ func TestOllamaProvider_Execute_Non200Status(t *testing.T) {
 }
 
 func TestOllamaProvider_Execute_ConnectionRefused(t *testing.T) {
-	// 接続できないアドレスを使用
 	p := NewOllamaProvider("http://127.0.0.1:1", "gemma2")
 	req := SimulationRequest{
-		SystemPrompt:   "test",
+		SystemPrompt:    "test",
 		CurrentSentence: "test",
-		TotalSentences: 1,
+		TotalSentences:  1,
 	}
 
 	_, err := p.Execute(req)
@@ -199,15 +190,15 @@ func TestOllamaProvider_Execute_ConnectionRefused(t *testing.T) {
 func TestOllamaProvider_Execute_InvalidOllamaJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("not valid json"))
+		_, _ = w.Write([]byte("not valid json"))
 	}))
 	defer server.Close()
 
 	p := NewOllamaProvider(server.URL, "gemma2")
 	req := SimulationRequest{
-		SystemPrompt:   "test",
+		SystemPrompt:    "test",
 		CurrentSentence: "test",
-		TotalSentences: 1,
+		TotalSentences:  1,
 	}
 
 	_, err := p.Execute(req)
@@ -220,7 +211,6 @@ func TestOllamaProvider_Execute_InvalidOllamaJSON(t *testing.T) {
 }
 
 func TestOllamaProvider_Execute_InvalidSimulationResponseJSON(t *testing.T) {
-	// OllamaレスポンスJSON自体は正しいが、LLMの出力がSimulationResponseとしてパースできない
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		resp := map[string]interface{}{
 			"message": map[string]interface{}{
@@ -229,15 +219,15 @@ func TestOllamaProvider_Execute_InvalidSimulationResponseJSON(t *testing.T) {
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
 	p := NewOllamaProvider(server.URL, "gemma2")
 	req := SimulationRequest{
-		SystemPrompt:   "test",
+		SystemPrompt:    "test",
 		CurrentSentence: "test",
-		TotalSentences: 1,
+		TotalSentences:  1,
 	}
 
 	_, err := p.Execute(req)
