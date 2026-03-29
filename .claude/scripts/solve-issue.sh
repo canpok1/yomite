@@ -43,6 +43,8 @@ fi
 echo "Issue #${ISSUE_NUMBER} の処理を開始します"
 
 # 処理完了後（成否問わず）にラベルを除去
+# NOTE: assign-to-claudeラベルは意図的に除去しない。
+# PRがマージされずに処理完了した場合に再処理を可能にするため。
 trap 'gh issue edit --repo "$REPO" "$ISSUE_NUMBER" --remove-label "in-progress-by-claude" || true' EXIT
 
 # in-progress-by-claudeラベルを付与
