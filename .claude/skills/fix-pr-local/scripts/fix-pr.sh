@@ -33,8 +33,8 @@ fi
 REPO="${REPO%.git}"
 
 echo "=== Step 1: マージ状態の確認 ==="
-MERGED=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json merged -q '.merged')
-if [ "$MERGED" = "true" ]; then
+PR_STATE=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json state -q '.state')
+if [ "$PR_STATE" = "MERGED" ]; then
   echo "PR #${PR_NUMBER} is already merged."
   exit 0
 fi
@@ -109,8 +109,8 @@ if [ "$STATUS" = "pending" ] || [ "$STATUS" = "unknown" ]; then
 fi
 
 echo "=== Step 6: マージ状態の再確認 ==="
-MERGED=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json merged -q '.merged')
-if [ "$MERGED" = "true" ]; then
+PR_STATE=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json state -q '.state')
+if [ "$PR_STATE" = "MERGED" ]; then
   echo "PR #${PR_NUMBER} has been merged via auto-merge."
   exit 0
 fi
