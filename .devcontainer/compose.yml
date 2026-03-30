@@ -8,9 +8,10 @@ services:
     volumes:
       - ../..:/workspaces:cached
     command: sleep infinity
-    depends_on:
-      ollama:
-        condition: service_healthy
+    # FIXME: unhealthyとなってしまうため一旦コメントアウト
+    # depends_on:
+    #   ollama:
+    #     condition: service_healthy
 
   ollama:
     image: ollama/ollama
