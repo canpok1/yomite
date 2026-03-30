@@ -27,6 +27,7 @@ type SimulationResponse struct {
 	Memory       string `json:"memory"`
 }
 
+
 // BuildPrompt はSimulationRequestからLLMに送るシステムプロンプトとユーザーメッセージを構築する。
 func BuildPrompt(req SimulationRequest) (system string, user string) {
 	system = req.SystemPrompt
@@ -43,16 +44,23 @@ func BuildPrompt(req SimulationRequest) (system string, user string) {
 ## 記憶バッファ
 %s
 
+## 読み進めルール
+- 基本的にすべての文を順番に読み進めてください。通常は next_index に現在の位置+1 を指定します。
+- next_index を null にできるのは、最後の文（位置 %d）を読み終えた場合のみです。
+- 疑問や混乱が生じた場合は、前の文に戻って読み返すこともできます（next_index に現在より小さい値を指定）。
+- 途中で読了（null）を返さないでください。必ず最後の文まで読み切ってください。
+
 ## 指示
 上記の文を読み、以下のJSON形式で応答してください。JSON以外のテキストは含めないでください。
 
 {
   "current_index": %d,
-  "next_index": <次に読む文のインデックス（整数）。読了する場合はnull>,
+  "next_index": <次に読む文のインデックス（整数）。最後の文を読み終えた場合のみnull>,
   "note": <感想がある場合は{"type": "QUESTION"|"RESOLVED"|"CONFUSION", "content": "感想の内容"}、なければnull>,
   "memory": "<記憶バッファの更新内容（自由テキスト）>"
 }`, req.CurrentIndex, req.TotalSentences, req.CurrentSentence,
 		memorySection,
+		req.TotalSentences-1,
 		req.CurrentIndex)
 
 	return system, user
@@ -65,7 +73,7 @@ type ErrInvalidJSON struct {
 }
 
 func (e *ErrInvalidJSON) Error() string {
-	return fmt.Sprintf("invalid JSON response: %v", e.Err)
+	return fmt.Sprintf("LLMが不正なJSON応答を返しました: %v\n応答内容: %s", e.Err, e.Raw)
 }
 
 func (e *ErrInvalidJSON) Unwrap() error {
