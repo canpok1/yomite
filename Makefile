@@ -19,6 +19,9 @@ fmt:
 lint:
 	golangci-lint run ./...
 
+run:
+	go run main.go ${options}
+
 all: build
 
 .PHONY: all setup build clean test fmt lint
