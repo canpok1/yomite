@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // Provider はLLMプロバイダのインターフェースを定義する。
@@ -91,11 +92,29 @@ func (e *ErrIndexOutOfRange) Error() string {
 	return fmt.Sprintf("index out of range: %s=%d (valid range: 0-%d)", e.Field, e.Index, e.Max-1)
 }
 
+// stripMarkdownCodeBlock はLLM応答からmarkdownコードブロック（```json ... ```）を除去する。
+// NOTE: LLMはプロンプトで「JSON以外のテキストは含めないでください」と指示しても
+// markdownコードブロックで応答をラップすることがあるため、パース前に除去する。
+func stripMarkdownCodeBlock(text string) string {
+	trimmed := strings.TrimSpace(text)
+	if strings.HasPrefix(trimmed, "```") {
+		// 最初の行（```json や ```）を除去
+		if idx := strings.Index(trimmed, "\n"); idx != -1 {
+			trimmed = trimmed[idx+1:]
+		}
+		// 末尾の ``` を除去
+		trimmed, _ = strings.CutSuffix(trimmed, "```")
+		return strings.TrimSpace(trimmed)
+	}
+	return trimmed
+}
+
 // ParseResponse はAIのテキスト出力からSimulationResponseをパースし、インデックスの範囲を検証する。
 func ParseResponse(text string, totalSentences int) (SimulationResponse, error) {
 	var resp SimulationResponse
 
-	if err := json.Unmarshal([]byte(text), &resp); err != nil {
+	cleaned := stripMarkdownCodeBlock(text)
+	if err := json.Unmarshal([]byte(cleaned), &resp); err != nil {
 		return resp, &ErrInvalidJSON{Raw: text, Err: err}
 	}
 
