@@ -164,6 +164,40 @@ func TestBuildPromptEmptyMemory(t *testing.T) {
 	}
 }
 
+func TestBuildPromptMemoryCapacityHint(t *testing.T) {
+	req := SimulationRequest{
+		SystemPrompt:    "あなたは初学者の読者です。",
+		CurrentSentence: "テスト文。",
+		CurrentIndex:    0,
+		TotalSentences:  5,
+		Memory:          "",
+		MemoryCapacity:  200,
+	}
+
+	_, user := BuildPrompt(req)
+
+	if !strings.Contains(user, "200 文字以内") {
+		t.Error("user message should contain memory capacity hint when MemoryCapacity > 0")
+	}
+}
+
+func TestBuildPromptNoMemoryCapacityHint(t *testing.T) {
+	req := SimulationRequest{
+		SystemPrompt:    "あなたは初学者の読者です。",
+		CurrentSentence: "テスト文。",
+		CurrentIndex:    0,
+		TotalSentences:  5,
+		Memory:          "",
+		MemoryCapacity:  0,
+	}
+
+	_, user := BuildPrompt(req)
+
+	if strings.Contains(user, "文字以内") {
+		t.Error("user message should not contain memory capacity hint when MemoryCapacity is 0")
+	}
+}
+
 func TestParseResponseValid(t *testing.T) {
 	input := `{
 		"current_index": 5,

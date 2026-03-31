@@ -28,6 +28,7 @@ func RunSimulation(doc Document, persona Persona, provider Provider) ([]Simulati
 			CurrentIndex:    currentIdx,
 			TotalSentences:  totalSentences,
 			Memory:          memory,
+			MemoryCapacity:  persona.MemoryCapacity,
 		}
 
 		resp, err := provider.Execute(req)

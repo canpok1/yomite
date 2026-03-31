@@ -18,6 +18,7 @@ type SimulationRequest struct {
 	CurrentIndex    int    // 文のインデックス
 	TotalSentences  int    // 文の総数
 	Memory          string // 記憶バッファ
+	MemoryCapacity  int    // 記憶バッファの最大文字数（0 = 制限なし）
 }
 
 // SimulationResponse はAIからの1ステップの出力を表す。
@@ -37,6 +38,11 @@ func BuildPrompt(req SimulationRequest) (system string, user string) {
 		memorySection = req.Memory
 	}
 
+	memoryCapacityHint := ""
+	if req.MemoryCapacity > 0 {
+		memoryCapacityHint = fmt.Sprintf("memory は %d 文字以内で要約してください。", req.MemoryCapacity)
+	}
+
 	user = fmt.Sprintf(`
 これから読む対象を教えます。
 教えるのは文書全体の中の一文だけですが、それを読んで、頭に思い浮かべたことや次に読む場所、覚えておきたいことを出力してください。
@@ -45,7 +51,7 @@ func BuildPrompt(req SimulationRequest) (system string, user string) {
 ## ルール
 - 基本的にすべての文を順番に読み進めてください。通常は next_index に現在の位置+1 を指定します。
 - next_index を null にできるのは、最後の文を読み終えた場合のみです。
-- これまで読んだ内容や重要事項の記載場所は要約して覚えておいてください。覚えておく内容は memory フィールドで出力してください。
+- これまで読んだ内容や重要事項の記載場所は要約して覚えておいてください。覚えておく内容は memory フィールドで出力してください。%s
 - 疑問や混乱が生じた場合は、前の文に戻って読み返すこともできます（next_index に現在より小さい値を指定）。
 - 途中で読了（null）を返さないでください。必ず最後の文まで読み切ってください。
 
@@ -72,6 +78,7 @@ func BuildPrompt(req SimulationRequest) (system string, user string) {
   "note": <感想がある場合は{"type": "QUESTION"|"RESOLVED"|"CONFUSION", "content": "感想の内容"}、なければnull>,
   "memory": "<次の文を読む際に覚えていたいこと（自由テキスト）>"
 }`+"```",
+		memoryCapacityHint,
 		req.CurrentIndex,
 		req.TotalSentences,
 		req.CurrentSentence,
