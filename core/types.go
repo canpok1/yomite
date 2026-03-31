@@ -25,8 +25,8 @@ type Sentence struct {
 // SimulationStep はシミュレーションの1ステップの結果を表す。
 type SimulationStep struct {
 	Step        int   `json:"step"`
-	SentenceIdx int   `json:"sentence_idx"`
-	TargetIdx   *int  `json:"target_idx"`
+	SentenceIdx int   `json:"current_index"`
+	TargetIdx   *int  `json:"next_index"`
 	Note        *Note `json:"note"`
 }
 

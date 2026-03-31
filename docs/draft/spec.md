@@ -114,8 +114,8 @@ type Sentence struct {
 ```go
 type SimulationStep struct {
     Step        int    `json:"step"`
-    SentenceIdx int    `json:"sentence_idx"` // 今読んだ文の位置
-    TargetIdx   *int   `json:"target_idx"`   // 次に読む文の位置 (nil = 読了)
+    SentenceIdx int    `json:"current_index"` // 今読んだ文の位置
+    TargetIdx   *int   `json:"next_index"`   // 次に読む文の位置 (nil = 読了)
     Note        *Note  `json:"note"`         // 思考の内容 (nil = 感想なし)
 }
 
