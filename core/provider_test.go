@@ -237,8 +237,22 @@ func TestParseResponseCurrentIndexOutOfRange(t *testing.T) {
 	}
 }
 
+func TestParseResponseNextIndexEqualsTotalSentences(t *testing.T) {
+	// NOTE: next_index == totalSentences はLLMが最終文の次へ進もうとしたケース。
+	// 範囲外エラーではなく読了（nil）として扱う。
+	input := `{"current_index": 9, "next_index": 10, "note": null, "memory": ""}`
+
+	resp, err := ParseResponse(input, 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.NextIndex != nil {
+		t.Errorf("NextIndex: got %v, want nil (should be treated as end-of-reading)", resp.NextIndex)
+	}
+}
+
 func TestParseResponseNextIndexOutOfRange(t *testing.T) {
-	input := `{"current_index": 0, "next_index": 10, "note": null, "memory": ""}`
+	input := `{"current_index": 0, "next_index": 11, "note": null, "memory": ""}`
 
 	_, err := ParseResponse(input, 10)
 	if err == nil {

@@ -140,7 +140,11 @@ func ParseResponse(text string, totalSentences int) (SimulationResponse, error) 
 
 	if resp.NextIndex != nil {
 		idx := *resp.NextIndex
-		if idx < 0 || idx >= totalSentences {
+		// NOTE: LLMが最後の文を読んだ後に next_index=totalSentences を返すことがある。
+		// これは「次の文へ進む」意図だが範囲外なので、読了（null）として扱う。
+		if idx == totalSentences {
+			resp.NextIndex = nil
+		} else if idx < 0 || idx >= totalSentences {
 			return resp, &ErrIndexOutOfRange{
 				Field: "next_index",
 				Index: idx,
