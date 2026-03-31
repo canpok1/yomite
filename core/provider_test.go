@@ -285,6 +285,19 @@ func TestParseResponseNextIndexEqualsTotalSentences(t *testing.T) {
 	}
 }
 
+func TestParseResponseNextIndexEqualsTotalSentencesFromNonFinal(t *testing.T) {
+	// 最終文以外から next_index == totalSentences が返された場合はエラー
+	input := `{"current_index": 5, "next_index": 10, "note": null, "memory": ""}`
+
+	_, err := ParseResponse(input, 10)
+	if err == nil {
+		t.Fatal("expected error for next_index == totalSentences from non-final sentence")
+	}
+	if !isErrIndexOutOfRange(err) {
+		t.Errorf("expected ErrIndexOutOfRange, got %T: %v", err, err)
+	}
+}
+
 func TestParseResponseNextIndexOutOfRange(t *testing.T) {
 	input := `{"current_index": 0, "next_index": 11, "note": null, "memory": ""}`
 

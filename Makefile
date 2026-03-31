@@ -24,4 +24,4 @@ run:
 
 all: build
 
-.PHONY: all setup build clean test fmt lint
+.PHONY: all setup build clean test fmt lint run

@@ -16,6 +16,6 @@ if [ ! -f "${SCRIPT_DIR}/.env" ]; then
 fi
 
 # ollamaにモデルをpull（未ダウンロードの場合のみ実行される）
-echo "Pulling qwen3:1.7b model from Ollama..."
-curl -s http://ollama:11434/api/pull -d '{"name": "gemma3"}'
+echo "Pulling gemma3 model from Ollama..."
+curl -fsS http://ollama:11434/api/pull -H "Content-Type: application/json" -d '{"name": "gemma3"}'
 echo "Ollama model pull completed."
