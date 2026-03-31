@@ -237,8 +237,22 @@ func TestParseResponseCurrentIndexOutOfRange(t *testing.T) {
 	}
 }
 
+func TestParseResponseNextIndexEqualsTotalSentences(t *testing.T) {
+	// NOTE: next_index == totalSentences はLLMが最終文の次へ進もうとしたケース。
+	// 範囲外エラーではなく読了（nil）として扱う。
+	input := `{"current_index": 9, "next_index": 10, "note": null, "memory": ""}`
+
+	resp, err := ParseResponse(input, 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.NextIndex != nil {
+		t.Errorf("NextIndex: got %v, want nil (should be treated as end-of-reading)", resp.NextIndex)
+	}
+}
+
 func TestParseResponseNextIndexOutOfRange(t *testing.T) {
-	input := `{"current_index": 0, "next_index": 10, "note": null, "memory": ""}`
+	input := `{"current_index": 0, "next_index": 11, "note": null, "memory": ""}`
 
 	_, err := ParseResponse(input, 10)
 	if err == nil {
@@ -258,6 +272,71 @@ func TestParseResponseNegativeNextIndex(t *testing.T) {
 	}
 	if !isErrIndexOutOfRange(err) {
 		t.Errorf("expected ErrIndexOutOfRange, got %T: %v", err, err)
+	}
+}
+
+func TestParseResponseMarkdownCodeBlock(t *testing.T) {
+	input := "```json\n{\"current_index\": 0, \"next_index\": 1, \"note\": null, \"memory\": null}\n```"
+
+	resp, err := ParseResponse(input, 5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.CurrentIndex != 0 {
+		t.Errorf("CurrentIndex: got %d, want 0", resp.CurrentIndex)
+	}
+	if resp.NextIndex == nil || *resp.NextIndex != 1 {
+		t.Errorf("NextIndex: got %v, want 1", resp.NextIndex)
+	}
+}
+
+func TestParseResponseMarkdownCodeBlockNoLang(t *testing.T) {
+	input := "```\n{\"current_index\": 0, \"next_index\": 1, \"note\": null, \"memory\": null}\n```"
+
+	resp, err := ParseResponse(input, 5)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.CurrentIndex != 0 {
+		t.Errorf("CurrentIndex: got %d, want 0", resp.CurrentIndex)
+	}
+}
+
+func TestStripMarkdownCodeBlock(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "plain JSON",
+			input: `{"key": "value"}`,
+			want:  `{"key": "value"}`,
+		},
+		{
+			name:  "with json lang",
+			input: "```json\n{\"key\": \"value\"}\n```",
+			want:  `{"key": "value"}`,
+		},
+		{
+			name:  "without lang",
+			input: "```\n{\"key\": \"value\"}\n```",
+			want:  `{"key": "value"}`,
+		},
+		{
+			name:  "with surrounding whitespace",
+			input: "  ```json\n{\"key\": \"value\"}\n```  ",
+			want:  `{"key": "value"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stripMarkdownCodeBlock(tt.input)
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 

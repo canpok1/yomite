@@ -166,8 +166,8 @@ func TestSimulationStepJSONRoundTripWithNil(t *testing.T) {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		t.Fatalf("Unmarshal to map failed: %v", err)
 	}
-	if raw["target_idx"] != nil {
-		t.Errorf("target_idx should be null in JSON, got %v", raw["target_idx"])
+	if raw["next_index"] != nil {
+		t.Errorf("next_index should be null in JSON, got %v", raw["next_index"])
 	}
 	if raw["note"] != nil {
 		t.Errorf("note should be null in JSON, got %v", raw["note"])

@@ -47,6 +47,8 @@ func RunSimulation(doc Document, persona Persona, provider Provider) ([]Simulati
 				}
 			}
 		}
+		// NOTE: ParseResponse が next_index==totalSentences を nil に変換済みなので
+		// ここでは追加の境界補正は不要。
 
 		steps = append(steps, SimulationStep{
 			Step:        step,
