@@ -2,7 +2,7 @@
   "name": "Ubuntu",
   "dockerComposeFile": "compose.yml",
   "service": "dev",
-  "runServices": ["ollama"],
+  "runServices": ["ollama", "open-webui"],
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {},
