@@ -69,7 +69,7 @@ fi
 
 # 待機秒数をコメント本文からパース
 # 例: "Please retry after 1234 seconds" や "retry in 1234 seconds"
-WAIT_SECONDS=$(echo "$BODY" | grep -oP '(?:retry (?:after|in) |wait )\K[0-9]+(?= seconds?)' | head -1)
+WAIT_SECONDS=$(echo "$BODY" | grep -oE '(retry (after|in)|wait) [0-9]+ seconds?' | grep -oE '[0-9]+' | head -1)
 if [ -z "$WAIT_SECONDS" ]; then
   # 秒数が取得できない場合はデフォルト 3600 秒（1時間）
   WAIT_SECONDS=3600
