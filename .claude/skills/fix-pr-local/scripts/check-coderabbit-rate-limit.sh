@@ -29,6 +29,8 @@ NAME="${REPO##*/}"
 # updatedAt でソートするため全件取得して jq で最新を選ぶ
 # NOTE: reviewThreads のコメントではなく issue comments を対象にする。
 # CodeRabbit はレート制限時にサマリーの issue comment を書き換えるため。
+# NOTE: comments(first: 100) のページネーションは意図的に省略している。
+# レート制限コメントは最新付近にあるため、100件で十分実用に耐える。
 RESULT=$(gh api graphql -f query='
   query($owner: String!, $name: String!, $number: Int!) {
     repository(owner: $owner, name: $name) {
