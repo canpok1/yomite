@@ -29,7 +29,7 @@ while true; do
     echo "=========================================="
     echo "Processing Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}"
     echo "=========================================="
-    "${SCRIPT_DIR}/solve-issue.sh" "$ISSUE_NUMBER" || true
+    "${SCRIPT_DIR}/solve-issue.sh" -p "$ISSUE_NUMBER" || true
     echo "Completed Issue #${ISSUE_NUMBER}."
   else
     printf "."
