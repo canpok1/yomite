@@ -37,6 +37,7 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 			CurrentIndex:    currentIdx,
 			TotalSentences:  totalSentences,
 			Memory:          memory,
+			MemoryCapacity:  persona.MemoryCapacity,
 		}
 
 		resp, err := provider.Execute(req)

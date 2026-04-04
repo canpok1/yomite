@@ -22,6 +22,7 @@ type SimulationRequest struct {
 	CurrentIndex    int    // 文のインデックス
 	TotalSentences  int    // 文の総数
 	Memory          string // 記憶バッファ
+	MemoryCapacity  int    // 記憶バッファの最大文字数
 }
 
 // SimulationResponse はAIからの1ステップの出力を表す。
@@ -44,6 +45,7 @@ type promptData struct {
 	TotalSentences  int
 	CurrentSentence string
 	MemorySection   string
+	MemoryCapacity  int
 }
 
 // BuildPrompt はSimulationRequestからLLMに送るシステムプロンプトとユーザーメッセージを構築する。
@@ -61,6 +63,7 @@ func BuildPrompt(req SimulationRequest) (system string, user string) {
 		TotalSentences:  req.TotalSentences,
 		CurrentSentence: req.CurrentSentence,
 		MemorySection:   memorySection,
+		MemoryCapacity:  req.MemoryCapacity,
 	}); err != nil {
 		panic(fmt.Sprintf("failed to execute user prompt template: %v", err))
 	}
