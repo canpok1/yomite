@@ -31,7 +31,8 @@
     }
   },
   "containerEnv": {
-    "WORKSPACE_DIR": "${containerWorkspaceFolder}"
+    "WORKSPACE_DIR": "${containerWorkspaceFolder}",
+    "VOX_ACTOR_WORKSPACE": "${containerWorkspaceFolder}/.tmp/notify"
   },
   "initializeCommand": "test -f .devcontainer/.env || cp .devcontainer/.env-template .devcontainer/.env",
   "postCreateCommand": "bash .devcontainer/post-create.sh",

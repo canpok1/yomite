@@ -10,7 +10,7 @@ Issueの自動アサインを行います。
 
 ## ワークフロー
 
-1. `base-tools:monologue` でアサイン開始を宣言する
+1. `/vox-actor-plugin:monologue` でアサイン開始を宣言する
 2. `gh issue list` でopen状態かつ `ready` ラベル付きのIssueを取得する
 3. 以下の条件に該当するIssueを除外する：
    - すでに `assign-to-claude` または `in-progress-by-claude` ラベルが付与されている
@@ -19,7 +19,7 @@ Issueの自動アサインを行います。
 4. `.claude/` 除外対象のIssueからは `ready` ラベルを除去し、除去をログに記録する
 5. 残りのIssueを `issue-assigner` エージェントの優先度基準に従って優先順位付けする
 6. 上位N件（デフォルト: 2件）に `assign-to-claude` ラベルを付与する
-7. `base-tools:monologue` でアサイン完了を宣言する
+7. `/vox-actor-plugin:monologue` でアサイン完了を宣言する
 
 ## 出力要件
 

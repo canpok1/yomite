@@ -78,6 +78,7 @@
     ],
     "Notification": [
       {
+        "matcher": "permission_request",
         "hooks": [
           {
             "type": "command",
@@ -103,13 +104,13 @@
   },
   "enabledPlugins": {
     "commit-commands@claude-plugins-official": true,
-    "base-tools@canpok1-plugins": true
+    "vox-actor-plugin@vox-actor-marketplace": true
   },
   "extraKnownMarketplaces": {
-    "canpok1-plugins": {
+    "vox-actor-marketplace": {
       "source": {
         "source": "github",
-        "repo": "canpok1/claude-code-plugins"
+        "repo": "canpok1/vox-actor"
       },
       "autoUpdate": true
     }
