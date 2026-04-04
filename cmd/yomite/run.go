@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 
 	"github.com/canpok1/yomite/core"
@@ -62,6 +63,26 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
+	// ログファイルを開く
+	logFile, err := os.OpenFile(cfg.Log.Path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "エラー: ログファイルを開けませんでした: %v\n", err)
+		return 1
+	}
+	defer func() { _ = logFile.Close() }()
+
+	handler := slog.NewJSONHandler(logFile, &slog.HandlerOptions{
+		Level: core.ToSlogLevel(cfg.Log.Level),
+	})
+	logger := slog.New(handler)
+
+	logger.Info("config loaded",
+		"log_level", cfg.Log.Level,
+		"log_path", cfg.Log.Path,
+		"provider", providerID,
+		"persona", personaID,
+	)
+
 	if providerID == "" {
 		providerID = cfg.DefaultProvider
 	}
@@ -94,9 +115,9 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 	doc.Sentences = doc.SplitSentences()
 
-	provider := providerFactory(providerCfg)
+	provider := core.NewLoggingProvider(providerFactory(providerCfg), logger)
 
-	steps, err := core.RunSimulation(doc, persona, provider)
+	steps, err := core.RunSimulation(doc, persona, provider, logger)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "エラー: シミュレーション実行に失敗しました: %v\n", err)
 		return 1

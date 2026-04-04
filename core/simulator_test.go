@@ -1,9 +1,16 @@
 package core
 
 import (
+	"bytes"
 	"errors"
+	"io"
+	"log/slog"
+	"strings"
 	"testing"
 )
+
+// discardLogger はテスト用の出力を破棄するロガー。
+var discardLogger = slog.New(slog.NewJSONHandler(io.Discard, nil))
 
 // mockProvider はテスト用のProviderモック。
 type mockProvider struct {
@@ -55,7 +62,7 @@ func TestRunSimulation_NormalCompletion(t *testing.T) {
 		},
 	}
 
-	steps, err := RunSimulation(doc, persona, mock)
+	steps, err := RunSimulation(doc, persona, mock, discardLogger)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -117,7 +124,7 @@ func TestRunSimulation_MaxStepsTermination(t *testing.T) {
 		},
 	}
 
-	steps, err := RunSimulation(doc, persona, mock)
+	steps, err := RunSimulation(doc, persona, mock, discardLogger)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -151,7 +158,7 @@ func TestRunSimulation_DefaultMaxSteps(t *testing.T) {
 		},
 	}
 
-	steps, err := RunSimulation(doc, persona, mock)
+	steps, err := RunSimulation(doc, persona, mock, discardLogger)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -186,7 +193,7 @@ func TestRunSimulation_ProviderError(t *testing.T) {
 		},
 	}
 
-	_, err := RunSimulation(doc, persona, mock)
+	_, err := RunSimulation(doc, persona, mock, discardLogger)
 	if err == nil {
 		t.Fatal("expected error from provider failure")
 	}
@@ -213,7 +220,7 @@ func TestRunSimulation_OutOfRangeNextIndex(t *testing.T) {
 		},
 	}
 
-	_, err := RunSimulation(doc, persona, mock)
+	_, err := RunSimulation(doc, persona, mock, discardLogger)
 	if err == nil {
 		t.Fatal("expected error for out-of-range next_index")
 	}
@@ -243,7 +250,7 @@ func TestRunSimulation_MemoryCapacityLimit(t *testing.T) {
 		},
 	}
 
-	steps, err := RunSimulation(doc, persona, mock)
+	steps, err := RunSimulation(doc, persona, mock, discardLogger)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -281,7 +288,7 @@ func TestRunSimulation_MemoryCapacityAppliedToNextStep(t *testing.T) {
 		},
 	}
 
-	_, err := RunSimulation(doc, persona, mock)
+	_, err := RunSimulation(doc, persona, mock, discardLogger)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -321,7 +328,7 @@ func TestRunSimulation_Backtracking(t *testing.T) {
 		},
 	}
 
-	steps, err := RunSimulation(doc, persona, mock)
+	steps, err := RunSimulation(doc, persona, mock, discardLogger)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -362,7 +369,7 @@ func TestRunSimulation_RequestFields(t *testing.T) {
 		},
 	}
 
-	_, err := RunSimulation(doc, persona, mock)
+	_, err := RunSimulation(doc, persona, mock, discardLogger)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -416,7 +423,7 @@ func TestRunSimulation_EmptyDocument(t *testing.T) {
 	}
 	mock := &mockProvider{}
 
-	steps, err := RunSimulation(doc, persona, mock)
+	steps, err := RunSimulation(doc, persona, mock, discardLogger)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -445,12 +452,88 @@ func TestRunSimulation_NegativeNextIndex(t *testing.T) {
 		},
 	}
 
-	_, err := RunSimulation(doc, persona, mock)
+	_, err := RunSimulation(doc, persona, mock, discardLogger)
 	if err == nil {
 		t.Fatal("expected error for negative next_index")
 	}
 	var idxErr *ErrIndexOutOfRange
 	if !errors.As(err, &idxErr) {
 		t.Errorf("expected ErrIndexOutOfRange, got %T: %v", err, err)
+	}
+}
+
+func TestRunSimulation_LogOutput(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	doc := Document{
+		ID:      "test.txt",
+		RawText: "文1。文2。",
+		Sentences: []Sentence{
+			{Index: 0, Content: "文1。"},
+			{Index: 1, Content: "文2。"},
+		},
+	}
+	persona := Persona{
+		DisplayName:    "テスト",
+		SystemPrompt:   "テスト用",
+		MemoryCapacity: 100,
+		MaxSteps:       10,
+	}
+	mock := &mockProvider{
+		responses: []SimulationResponse{
+			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "m1"},
+			{CurrentIndex: 1, NextIndex: nil, Memory: "m2"},
+		},
+	}
+
+	_, err := RunSimulation(doc, persona, mock, logger)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	logs := buf.String()
+	if !strings.Contains(logs, "simulation started") {
+		t.Errorf("expected 'simulation started' log")
+	}
+	if !strings.Contains(logs, "step completed") {
+		t.Errorf("expected 'step completed' log")
+	}
+	if !strings.Contains(logs, "simulation finished") {
+		t.Errorf("expected 'simulation finished' log")
+	}
+}
+
+func TestRunSimulation_MemoryTruncationLog(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn}))
+
+	doc := Document{
+		ID:      "test.txt",
+		RawText: "文1。",
+		Sentences: []Sentence{
+			{Index: 0, Content: "文1。"},
+		},
+	}
+	persona := Persona{
+		DisplayName:    "テスト",
+		SystemPrompt:   "テスト用",
+		MemoryCapacity: 3,
+		MaxSteps:       10,
+	}
+	mock := &mockProvider{
+		responses: []SimulationResponse{
+			{CurrentIndex: 0, NextIndex: nil, Memory: "あいうえお"},
+		},
+	}
+
+	_, err := RunSimulation(doc, persona, mock, logger)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	logs := buf.String()
+	if !strings.Contains(logs, "memory truncated") {
+		t.Errorf("expected 'memory truncated' warn log, got: %s", logs)
 	}
 }

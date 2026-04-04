@@ -33,7 +33,9 @@ func intPtr(v int) *int {
 // writeTestConfig は一時ディレクトリにテスト用設定ファイルを作成する。
 func writeTestConfig(t *testing.T) string {
 	t.Helper()
+	logPath := filepath.Join(t.TempDir(), "test.log")
 	cfg := core.Config{
+		Log:             core.LogConfig{Level: "warn", Path: logPath},
 		DefaultProvider: "test-provider",
 		DefaultPersona:  "test-persona",
 		Providers: map[string]core.ProviderConfig{
@@ -347,5 +349,113 @@ func TestOutputText_Reread(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "再読") {
 		t.Errorf("expected reread direction, got: %s", stdout.String())
+	}
+}
+
+func TestRun_Integration_LogFileCreated(t *testing.T) {
+	inputPath := writeTestInput(t, "テスト文1。テスト文2。")
+	logPath := filepath.Join(t.TempDir(), "test.log")
+	cfg := core.Config{
+		Log:             core.LogConfig{Level: "info", Path: logPath},
+		DefaultProvider: "test-provider",
+		DefaultPersona:  "test-persona",
+		Providers: map[string]core.ProviderConfig{
+			"test-provider": {Type: "ollama", Model: "test", Origin: "http://localhost:11434"},
+		},
+		Personas: map[string]core.Persona{
+			"test-persona": {DisplayName: "T", SystemPrompt: "テスト用", MemoryCapacity: 100, MaxSteps: 10},
+		},
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(configPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	mock := &mockProvider{
+		responses: []core.SimulationResponse{
+			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "m1"},
+			{CurrentIndex: 1, NextIndex: nil, Memory: "m2"},
+		},
+	}
+
+	origFactory := providerFactory
+	providerFactory = func(_ core.ProviderConfig) core.Provider { return mock }
+	defer func() { providerFactory = origFactory }()
+
+	var stdout, stderr bytes.Buffer
+	code := Run([]string{"-f", inputPath, "--config", configPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d; stderr: %s", code, stderr.String())
+	}
+
+	// ログファイルが作成されていること
+	logData, err := os.ReadFile(cfg.Log.Path)
+	if err != nil {
+		t.Fatalf("failed to read log file: %v", err)
+	}
+	logContent := string(logData)
+
+	if !strings.Contains(logContent, "simulation started") {
+		t.Errorf("expected 'simulation started' in log file")
+	}
+	if !strings.Contains(logContent, "simulation finished") {
+		t.Errorf("expected 'simulation finished' in log file")
+	}
+}
+
+func TestRun_Integration_DebugLogIncludesLLM(t *testing.T) {
+	inputPath := writeTestInput(t, "テスト文。")
+	logPath := filepath.Join(t.TempDir(), "debug.log")
+	cfg := core.Config{
+		Log:             core.LogConfig{Level: "debug", Path: logPath},
+		DefaultProvider: "test-provider",
+		DefaultPersona:  "test-persona",
+		Providers: map[string]core.ProviderConfig{
+			"test-provider": {Type: "ollama", Model: "test", Origin: "http://localhost:11434"},
+		},
+		Personas: map[string]core.Persona{
+			"test-persona": {DisplayName: "T", SystemPrompt: "テスト用", MemoryCapacity: 100, MaxSteps: 10},
+		},
+	}
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(configPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	mock := &mockProvider{
+		responses: []core.SimulationResponse{
+			{CurrentIndex: 0, NextIndex: nil, Memory: "m", RawResponseText: `{"current_index":0}`},
+		},
+	}
+
+	origFactory := providerFactory
+	providerFactory = func(_ core.ProviderConfig) core.Provider { return mock }
+	defer func() { providerFactory = origFactory }()
+
+	var stdout, stderr bytes.Buffer
+	code := Run([]string{"-f", inputPath, "--config", configPath}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d; stderr: %s", code, stderr.String())
+	}
+
+	logData, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("failed to read log file: %v", err)
+	}
+	logContent := string(logData)
+
+	if !strings.Contains(logContent, "llm request") {
+		t.Errorf("expected 'llm request' in debug log")
+	}
+	if !strings.Contains(logContent, "llm response") {
+		t.Errorf("expected 'llm response' in debug log")
 	}
 }

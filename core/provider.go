@@ -22,10 +22,11 @@ type SimulationRequest struct {
 
 // SimulationResponse はAIからの1ステップの出力を表す。
 type SimulationResponse struct {
-	CurrentIndex int    `json:"current_index"`
-	NextIndex    *int   `json:"next_index"` // nil = 読了
-	Note         *Note  `json:"note"`       // nil = 感想なし
-	Memory       string `json:"memory"`
+	CurrentIndex    int    `json:"current_index"`
+	NextIndex       *int   `json:"next_index"` // nil = 読了
+	Note            *Note  `json:"note"`       // nil = 感想なし
+	Memory          string `json:"memory"`
+	RawResponseText string `json:"-"` // デバッグ用。ユーザー向けJSON出力には含まれない
 }
 
 // BuildPrompt はSimulationRequestからLLMに送るシステムプロンプトとユーザーメッセージを構築する。
@@ -124,6 +125,8 @@ func stripMarkdownCodeBlock(text string) string {
 // ParseResponse はAIのテキスト出力からSimulationResponseをパースし、インデックスの範囲を検証する。
 func ParseResponse(text string, totalSentences int) (SimulationResponse, error) {
 	var resp SimulationResponse
+
+	resp.RawResponseText = text
 
 	cleaned := stripMarkdownCodeBlock(text)
 	if err := json.Unmarshal([]byte(cleaned), &resp); err != nil {
