@@ -1,0 +1,58 @@
+name: gui-release
+
+on:
+  push:
+    tags:
+      # NOTE: release.yml と同じパターン。GitHub Actions の制約上、トリガーの共通化はできない。
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gui-build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: amd64
+            archive_ext: tar.gz
+          # NOTE: macos-latest は Apple Silicon (arm64)。Intel Mac 向けは需要に応じて追加する。
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+            archive_ext: tar.gz
+          - os: windows-latest
+            platform: windows
+            arch: amd64
+            archive_ext: zip
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-gui-build
+
+      - name: Build GUI binary
+        run: wails build -platform ${{ matrix.platform }}/${{ matrix.arch }}
+
+      - name: Create archive (tar.gz)
+        if: matrix.archive_ext == 'tar.gz'
+        run: tar czf yomite-gui_${{ matrix.platform }}_${{ matrix.arch }}.tar.gz -C build/bin .
+
+      - name: Create archive (zip)
+        if: matrix.archive_ext == 'zip'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path build/bin/* -DestinationPath yomite-gui_${{ matrix.platform }}_${{ matrix.arch }}.${{ matrix.archive_ext }}
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: yomite-gui_${{ matrix.platform }}_${{ matrix.arch }}.${{ matrix.archive_ext }}
