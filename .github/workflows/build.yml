@@ -48,7 +48,7 @@ jobs:
     - uses: ./.github/actions/setup-gui-build
 
     - name: Build GUI
-      run: wails build -tags webkit2_41
+      run: wails build -tags "gui,webkit2_41"
 
   goreleaser-check:
     needs: build
