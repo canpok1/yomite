@@ -3,6 +3,7 @@ name: doc-reviewer
 description: コード変更に対するドキュメント整合性チェックとMarkdownリンク検証を行うエージェント
 tools: Bash, Glob, Grep, Read
 model: sonnet
+memory: project
 ---
 
 # ドキュメント検証エージェント
