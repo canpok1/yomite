@@ -29,6 +29,9 @@ lint:
 run:
 	go run . ${options}
 
+run-gui:
+	wails dev -tags gui
+
 all: build
 
-.PHONY: all setup setup-gui build build-gui clean test fmt lint
+.PHONY: all setup setup-gui build build-gui clean test fmt lint run run-gui
