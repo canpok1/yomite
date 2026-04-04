@@ -7,7 +7,7 @@ SKILL.mdファイルの作成・修正時の標準ルール。
 - **プラグインスキル**: `{namespace}:{skill-name}` 形式
   - 例: `commit-commands:commit-push-pr`
 - **ローカルスキル**: `/skill-name` 形式
-  - 例: `/monologue`, `/review`
+  - 例: `/review`
 
 > 省略形を使うとレビュアーが正式名称と一致しないと判断し、CHANGESが発生する。必ず正式名称を使うこと。
 
