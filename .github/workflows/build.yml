@@ -39,6 +39,17 @@ jobs:
     - name: Build
       run: make build
 
+  gui-build-check:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - uses: ./.github/actions/setup-gui-build
+
+    - name: Build GUI
+      run: wails build
+
   goreleaser-check:
     needs: build
     uses: ./.github/workflows/goreleaser.yml
