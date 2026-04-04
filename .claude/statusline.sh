@@ -5,14 +5,13 @@
 INPUT=$(cat)
 
 # 全ての値を一度のjq呼び出しで抽出
-IFS=$'\t' read -r model context_size current_usage cost input_tokens output_tokens < <(
+IFS=$'\t' read -r model context_percent cost input_tokens output_tokens < <(
   echo "$INPUT" | jq -r '[
-    .model // "",
-    .contextWindow.totalSize // 0,
-    .contextWindow.currentUsage // 0,
-    .costUSD // "",
-    ((.usage.inputTokens // 0) + (.usage.cacheCreationInputTokens // 0) + (.usage.cacheReadInputTokens // 0)),
-    .usage.outputTokens // 0
+    .model.display_name // "",
+    .context_window.used_percentage // 0,
+    .cost.total_cost_usd // "",
+    .context_window.total_input_tokens // 0,
+    .context_window.total_output_tokens // 0
   ] | @tsv'
 )
 
@@ -27,12 +26,8 @@ format_tokens() {
   fi
 }
 
-# コンテキスト使用率の計算
-if [ "$context_size" -eq 0 ] 2>/dev/null; then
-  context_percent=0
-else
-  context_percent=$((current_usage * 100 / context_size))
-fi
+# コンテキスト使用率（小数点以下を切り捨て）
+context_percent=${context_percent%.*}
 
 formatted_input=$(format_tokens "$input_tokens")
 formatted_output=$(format_tokens "$output_tokens")
@@ -40,6 +35,7 @@ formatted_output=$(format_tokens "$output_tokens")
 output="Model: ${model} | Context: ${context_percent}% | Tokens: ${formatted_input} in / ${formatted_output} out"
 
 if [ -n "$cost" ]; then
+  cost=$(printf '%.2f' "$cost")
   output="${output} | Cost: \$${cost}"
 fi
 
