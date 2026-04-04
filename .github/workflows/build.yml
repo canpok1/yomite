@@ -40,7 +40,7 @@ jobs:
       run: make build
 
   gui-build-check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
     - uses: actions/checkout@v6
@@ -48,7 +48,7 @@ jobs:
     - uses: ./.github/actions/setup-gui-build
 
     - name: Build GUI
-      run: wails build
+      run: make build-gui
 
   goreleaser-check:
     needs: build

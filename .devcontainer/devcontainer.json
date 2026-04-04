@@ -7,8 +7,12 @@
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers/features/go:1": {},
-    "ghcr.io/devcontainers/features/node:1": {}
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/desktop-lite:1": {
+			"webPort": "6080"
+		}
   },
+  "forwardPorts": [6080],
   "remoteUser": "vscode",
   "mounts": [
     {

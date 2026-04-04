@@ -10,12 +10,13 @@ setup-gui:
 	cd frontend && npm install
 
 build-gui:
-	cd frontend && npm run build
-	go build -tags gui -o $(BINARY_NAME)-gui .
+	mkdir -p frontend/dist && touch frontend/dist/.gitkeep
+	wails build -tags gui -o $(BINARY_NAME)-gui
 
 clean:
 	go clean
-	rm -f $(BINARY_NAME) $(BINARY_NAME)-gui
+	rm -f $(BINARY_NAME)
+	rm -rf build/bin
 
 test:
 	go test ./...
@@ -29,6 +30,9 @@ lint:
 run:
 	go run . ${options}
 
+run-gui:
+	wails dev -tags gui
+
 all: build
 
-.PHONY: all setup setup-gui build build-gui clean test fmt lint
+.PHONY: all setup setup-gui build build-gui clean test fmt lint run run-gui
