@@ -1,44 +1,63 @@
-import { useState } from 'react';
-import { Greet } from '../wailsjs/go/main/App';
+import { useState } from "react";
+import { Editor } from "./components/Editor";
+import { SentenceList } from "./components/SentenceList";
+import type { Sentence } from "./types";
+
+// NOTE: Go側のLoadDocumentバインディングが未接続のため、
+// クライアント側で簡易的に文分割を行うスタブ実装。
+// 正確な分割ロジックはGo側(core/document.go)にあり、バインディング接続時に置き換える。
+function splitSentencesStub(text: string): Sentence[] {
+  return text
+    .split(/(?<=[。！？」])|(?<=[.!?])\s/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((content, index) => ({ index, content }));
+}
 
 function App() {
-  const [name, setName] = useState('');
-  const [result, setResult] = useState('');
+  const [sentences, setSentences] = useState<Sentence[]>([]);
 
-  async function greet() {
-    if (!name.trim()) return;
-    try {
-      const greeting = await Greet(name);
-      setResult(greeting);
-    } catch (e) {
-      setResult(`エラー: ${e}`);
-    }
+  function handleLoadDocument(text: string) {
+    // TODO: LoadDocumentバインディングに置き換え
+    const result = splitSentencesStub(text);
+    setSentences(result);
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-8">
-      <h1 className="text-4xl font-bold mb-8">yomite</h1>
-      <div className="flex gap-2 mb-4">
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && greet()}
-          placeholder="名前を入力"
-          className="px-4 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <button
-          onClick={greet}
-          className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-        >
-          Greet
-        </button>
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+      <header className="shrink-0 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
+        <h1 className="text-xl font-bold">yomite</h1>
+      </header>
+
+      <div className="flex-1 flex min-h-0">
+        {/* 左パネル: エディタ */}
+        <section className="w-1/2 p-4 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+          <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-2">
+            ドキュメント
+          </h2>
+          <div className="flex-1 flex flex-col min-h-0">
+            <Editor onLoadDocument={handleLoadDocument} />
+          </div>
+          {sentences.length > 0 && (
+            <div className="mt-4 overflow-y-auto max-h-[40%]">
+              <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                文一覧
+              </h2>
+              <SentenceList sentences={sentences} />
+            </div>
+          )}
+        </section>
+
+        {/* 右パネル: シミュレーション結果（プレースホルダー） */}
+        <section className="w-1/2 p-4 flex flex-col">
+          <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-2">
+            シミュレーション結果
+          </h2>
+          <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500">
+            <p>シミュレーション結果がここに表示されます</p>
+          </div>
+        </section>
       </div>
-      {result && (
-        <p className="text-lg mt-4 p-4 bg-white dark:bg-gray-800 rounded shadow">
-          {result}
-        </p>
-      )}
     </div>
   );
 }
