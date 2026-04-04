@@ -37,6 +37,19 @@ func intPtr(v int) *int {
 	return &v
 }
 
+// collectSteps はコールバックで受け取ったステップをスライスに集めるヘルパー。
+func collectSteps() (onStep func(SimulationStep) error, getSteps func() []SimulationStep) {
+	var steps []SimulationStep
+	onStep = func(s SimulationStep) error {
+		steps = append(steps, s)
+		return nil
+	}
+	getSteps = func() []SimulationStep {
+		return steps
+	}
+	return
+}
+
 func TestRunSimulation_NormalCompletion(t *testing.T) {
 	// 3文のドキュメントを順に読み、2文目でnilを返して終了
 	doc := Document{
@@ -62,11 +75,13 @@ func TestRunSimulation_NormalCompletion(t *testing.T) {
 		},
 	}
 
-	steps, err := RunSimulation(doc, persona, mock, discardLogger)
+	onStep, getSteps := collectSteps()
+	err := RunSimulation(doc, persona, mock, discardLogger, onStep)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	steps := getSteps()
 	if len(steps) != 3 {
 		t.Fatalf("expected 3 steps, got %d", len(steps))
 	}
@@ -112,30 +127,30 @@ func TestRunSimulation_MaxStepsTermination(t *testing.T) {
 		DisplayName:    "テスト",
 		SystemPrompt:   "テスト用",
 		MemoryCapacity: 100,
-		MaxSteps:       3, // 明示的にmax_stepsを指定
+		MaxSteps:       3,
 	}
-	// 永遠にループするレスポンス
 	mock := &mockProvider{
 		responses: []SimulationResponse{
 			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "m1"},
 			{CurrentIndex: 1, NextIndex: intPtr(0), Memory: "m2"},
 			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "m3"},
-			{CurrentIndex: 1, NextIndex: intPtr(0), Memory: "m4"}, // ここには到達しない
+			{CurrentIndex: 1, NextIndex: intPtr(0), Memory: "m4"},
 		},
 	}
 
-	steps, err := RunSimulation(doc, persona, mock, discardLogger)
+	onStep, getSteps := collectSteps()
+	err := RunSimulation(doc, persona, mock, discardLogger, onStep)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	steps := getSteps()
 	if len(steps) != 3 {
 		t.Fatalf("expected 3 steps (max_steps), got %d", len(steps))
 	}
 }
 
 func TestRunSimulation_DefaultMaxSteps(t *testing.T) {
-	// MaxSteps=0 の場合、デフォルト (文数×3) が使用される
 	doc := Document{
 		ID:      "test",
 		RawText: "文1。",
@@ -147,22 +162,24 @@ func TestRunSimulation_DefaultMaxSteps(t *testing.T) {
 		DisplayName:    "テスト",
 		SystemPrompt:   "テスト用",
 		MemoryCapacity: 100,
-		MaxSteps:       0, // デフォルト: 1×3=3
+		MaxSteps:       0,
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
 			{CurrentIndex: 0, NextIndex: intPtr(0), Memory: "m1"},
 			{CurrentIndex: 0, NextIndex: intPtr(0), Memory: "m2"},
 			{CurrentIndex: 0, NextIndex: intPtr(0), Memory: "m3"},
-			{CurrentIndex: 0, NextIndex: intPtr(0), Memory: "m4"}, // 到達しない
+			{CurrentIndex: 0, NextIndex: intPtr(0), Memory: "m4"},
 		},
 	}
 
-	steps, err := RunSimulation(doc, persona, mock, discardLogger)
+	onStep, getSteps := collectSteps()
+	err := RunSimulation(doc, persona, mock, discardLogger, onStep)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	steps := getSteps()
 	if len(steps) != 3 {
 		t.Fatalf("expected 3 steps (default max_steps=sentences*3), got %d", len(steps))
 	}
@@ -193,7 +210,8 @@ func TestRunSimulation_ProviderError(t *testing.T) {
 		},
 	}
 
-	_, err := RunSimulation(doc, persona, mock, discardLogger)
+	onStep, _ := collectSteps()
+	err := RunSimulation(doc, persona, mock, discardLogger, onStep)
 	if err == nil {
 		t.Fatal("expected error from provider failure")
 	}
@@ -216,11 +234,12 @@ func TestRunSimulation_OutOfRangeNextIndex(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: intPtr(99), Memory: "m1"}, // 範囲外
+			{CurrentIndex: 0, NextIndex: intPtr(99), Memory: "m1"},
 		},
 	}
 
-	_, err := RunSimulation(doc, persona, mock, discardLogger)
+	onStep, _ := collectSteps()
+	err := RunSimulation(doc, persona, mock, discardLogger, onStep)
 	if err == nil {
 		t.Fatal("expected error for out-of-range next_index")
 	}
@@ -241,26 +260,25 @@ func TestRunSimulation_MemoryCapacityLimit(t *testing.T) {
 	persona := Persona{
 		DisplayName:    "テスト",
 		SystemPrompt:   "テスト用",
-		MemoryCapacity: 5, // 5文字まで
+		MemoryCapacity: 5,
 		MaxSteps:       10,
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: nil, Memory: "これは長い記憶バッファです"}, // 12文字 → 5文字に切り詰め
+			{CurrentIndex: 0, NextIndex: nil, Memory: "これは長い記憶バッファです"},
 		},
 	}
 
-	steps, err := RunSimulation(doc, persona, mock, discardLogger)
+	onStep, getSteps := collectSteps()
+	err := RunSimulation(doc, persona, mock, discardLogger, onStep)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	steps := getSteps()
 	if len(steps) != 1 {
 		t.Fatalf("expected 1 step, got %d", len(steps))
 	}
 
-	// 次のリクエストに渡されるmemoryが制限されていることを確認
-	// この場合はステップ1つで終了するので、mockへのリクエストのmemoryを検証
-	// 最初のリクエストのmemoryは空
 	if mock.calls[0].Memory != "" {
 		t.Errorf("first request should have empty memory, got %q", mock.calls[0].Memory)
 	}
@@ -278,22 +296,22 @@ func TestRunSimulation_MemoryCapacityAppliedToNextStep(t *testing.T) {
 	persona := Persona{
 		DisplayName:    "テスト",
 		SystemPrompt:   "テスト用",
-		MemoryCapacity: 3, // 3文字まで
+		MemoryCapacity: 3,
 		MaxSteps:       10,
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "あいうえお"}, // 5文字 → 3文字に切り詰め
+			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "あいうえお"},
 			{CurrentIndex: 1, NextIndex: nil, Memory: "ok"},
 		},
 	}
 
-	_, err := RunSimulation(doc, persona, mock, discardLogger)
+	onStep, _ := collectSteps()
+	err := RunSimulation(doc, persona, mock, discardLogger, onStep)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// 2回目のリクエストで、memoryが3文字に切り詰められていることを確認
 	if len(mock.calls) < 2 {
 		t.Fatalf("expected at least 2 calls, got %d", len(mock.calls))
 	}
@@ -303,7 +321,6 @@ func TestRunSimulation_MemoryCapacityAppliedToNextStep(t *testing.T) {
 }
 
 func TestRunSimulation_Backtracking(t *testing.T) {
-	// AIが後戻りするケース
 	doc := Document{
 		ID:      "test",
 		RawText: "文1。文2。文3。",
@@ -322,22 +339,23 @@ func TestRunSimulation_Backtracking(t *testing.T) {
 	mock := &mockProvider{
 		responses: []SimulationResponse{
 			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "m1"},
-			{CurrentIndex: 1, NextIndex: intPtr(0), Memory: "m2"}, // 後戻り
-			{CurrentIndex: 0, NextIndex: intPtr(2), Memory: "m3"}, // スキップ
+			{CurrentIndex: 1, NextIndex: intPtr(0), Memory: "m2"},
+			{CurrentIndex: 0, NextIndex: intPtr(2), Memory: "m3"},
 			{CurrentIndex: 2, NextIndex: nil, Memory: "m4"},
 		},
 	}
 
-	steps, err := RunSimulation(doc, persona, mock, discardLogger)
+	onStep, getSteps := collectSteps()
+	err := RunSimulation(doc, persona, mock, discardLogger, onStep)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	steps := getSteps()
 	if len(steps) != 4 {
 		t.Fatalf("expected 4 steps, got %d", len(steps))
 	}
 
-	// 後戻り確認
 	if steps[1].TargetIdx == nil || *steps[1].TargetIdx != 0 {
 		t.Errorf("step 1 should backtrack to 0")
 	}
@@ -347,7 +365,6 @@ func TestRunSimulation_Backtracking(t *testing.T) {
 }
 
 func TestRunSimulation_RequestFields(t *testing.T) {
-	// Provider.Execute に正しいリクエストが渡されることを確認
 	doc := Document{
 		ID:      "test",
 		RawText: "文1。文2。",
@@ -369,7 +386,8 @@ func TestRunSimulation_RequestFields(t *testing.T) {
 		},
 	}
 
-	_, err := RunSimulation(doc, persona, mock, discardLogger)
+	onStep, _ := collectSteps()
+	err := RunSimulation(doc, persona, mock, discardLogger, onStep)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -378,7 +396,6 @@ func TestRunSimulation_RequestFields(t *testing.T) {
 		t.Fatalf("expected 2 calls, got %d", len(mock.calls))
 	}
 
-	// 1回目のリクエスト
 	req0 := mock.calls[0]
 	if req0.SystemPrompt != "あなたはテスト用AIです" {
 		t.Errorf("req0.SystemPrompt: got %q", req0.SystemPrompt)
@@ -396,7 +413,6 @@ func TestRunSimulation_RequestFields(t *testing.T) {
 		t.Errorf("req0.Memory: got %q, want empty", req0.Memory)
 	}
 
-	// 2回目のリクエスト
 	req1 := mock.calls[1]
 	if req1.CurrentSentence != "文2。" {
 		t.Errorf("req1.CurrentSentence: got %q", req1.CurrentSentence)
@@ -423,12 +439,13 @@ func TestRunSimulation_EmptyDocument(t *testing.T) {
 	}
 	mock := &mockProvider{}
 
-	steps, err := RunSimulation(doc, persona, mock, discardLogger)
+	onStep, getSteps := collectSteps()
+	err := RunSimulation(doc, persona, mock, discardLogger, onStep)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(steps) != 0 {
-		t.Errorf("expected 0 steps for empty document, got %d", len(steps))
+	if len(getSteps()) != 0 {
+		t.Errorf("expected 0 steps for empty document, got %d", len(getSteps()))
 	}
 }
 
@@ -448,11 +465,12 @@ func TestRunSimulation_NegativeNextIndex(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: intPtr(-1), Memory: "m1"}, // 負のインデックス
+			{CurrentIndex: 0, NextIndex: intPtr(-1), Memory: "m1"},
 		},
 	}
 
-	_, err := RunSimulation(doc, persona, mock, discardLogger)
+	onStep, _ := collectSteps()
+	err := RunSimulation(doc, persona, mock, discardLogger, onStep)
 	if err == nil {
 		t.Fatal("expected error for negative next_index")
 	}
@@ -487,7 +505,8 @@ func TestRunSimulation_LogOutput(t *testing.T) {
 		},
 	}
 
-	_, err := RunSimulation(doc, persona, mock, logger)
+	onStep, _ := collectSteps()
+	err := RunSimulation(doc, persona, mock, logger, onStep)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -527,7 +546,8 @@ func TestRunSimulation_MemoryTruncationLog(t *testing.T) {
 		},
 	}
 
-	_, err := RunSimulation(doc, persona, mock, logger)
+	onStep, _ := collectSteps()
+	err := RunSimulation(doc, persona, mock, logger, onStep)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -535,5 +555,87 @@ func TestRunSimulation_MemoryTruncationLog(t *testing.T) {
 	logs := buf.String()
 	if !strings.Contains(logs, "memory truncated") {
 		t.Errorf("expected 'memory truncated' warn log, got: %s", logs)
+	}
+}
+
+func TestRunSimulation_CallbackCalledPerStep(t *testing.T) {
+	doc := Document{
+		ID:      "test",
+		RawText: "文1。文2。",
+		Sentences: []Sentence{
+			{Index: 0, Content: "文1。"},
+			{Index: 1, Content: "文2。"},
+		},
+	}
+	persona := Persona{
+		DisplayName:    "テスト",
+		SystemPrompt:   "テスト用",
+		MemoryCapacity: 100,
+		MaxSteps:       10,
+	}
+	mock := &mockProvider{
+		responses: []SimulationResponse{
+			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "m1"},
+			{CurrentIndex: 1, NextIndex: nil, Memory: "m2"},
+		},
+	}
+
+	var callOrder []int
+	onStep := func(s SimulationStep) error {
+		callOrder = append(callOrder, s.Step)
+		return nil
+	}
+	err := RunSimulation(doc, persona, mock, discardLogger, onStep)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(callOrder) != 2 {
+		t.Fatalf("expected 2 callback calls, got %d", len(callOrder))
+	}
+	if callOrder[0] != 0 || callOrder[1] != 1 {
+		t.Errorf("expected callback order [0, 1], got %v", callOrder)
+	}
+}
+
+func TestRunSimulation_CallbackError(t *testing.T) {
+	doc := Document{
+		ID:      "test",
+		RawText: "文1。文2。",
+		Sentences: []Sentence{
+			{Index: 0, Content: "文1。"},
+			{Index: 1, Content: "文2。"},
+		},
+	}
+	persona := Persona{
+		DisplayName:    "テスト",
+		SystemPrompt:   "テスト用",
+		MemoryCapacity: 100,
+		MaxSteps:       10,
+	}
+	mock := &mockProvider{
+		responses: []SimulationResponse{
+			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "m1"},
+			{CurrentIndex: 1, NextIndex: nil, Memory: "m2"},
+		},
+	}
+
+	callbackErr := errors.New("output failed")
+	onStep := func(s SimulationStep) error {
+		if s.Step == 0 {
+			return callbackErr
+		}
+		return nil
+	}
+	err := RunSimulation(doc, persona, mock, discardLogger, onStep)
+	if err == nil {
+		t.Fatal("expected error from callback failure")
+	}
+	if !errors.Is(err, callbackErr) {
+		t.Errorf("expected callback error to be wrapped, got: %v", err)
+	}
+	// プロバイダは1回だけ呼ばれる（コールバックエラーで中断）
+	if mock.callIdx != 1 {
+		t.Errorf("expected provider to be called once, got %d", mock.callIdx)
 	}
 }
