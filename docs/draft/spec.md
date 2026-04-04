@@ -31,6 +31,10 @@
 
 ```json
 {
+  "log": {
+    "level": "info",
+    "path": "/tmp/yomite.log"
+  },
   "default_provider": "local_ollama",
   "default_persona": "beginner",
   "providers": {
@@ -61,6 +65,8 @@
 
 | フィールド | 説明 |
 |---|---|
+| `log.level` | ログレベル（`"debug"`, `"info"`, `"warn"`）。上位は下位を包含する |
+| `log.path` | ログ出力先ファイルパス（必須） |
 | `default_provider` | CLIオプション等で未指定時に使用するプロバイダID |
 | `default_persona` | CLIオプション等で未指定時に使用するペルソナID |
 | `providers.*.type` | プロバイダ種別（MVP では `"ollama"` のみ） |

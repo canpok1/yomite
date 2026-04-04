@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 func TestConfigJSONRoundTrip(t *testing.T) {
 	original := Config{
+		Log:             LogConfig{Level: "info", Path: "/tmp/test.log"},
 		DefaultProvider: "local_ollama",
 		DefaultPersona:  "beginner",
 		Providers: map[string]ProviderConfig{
@@ -39,6 +41,12 @@ func TestConfigJSONRoundTrip(t *testing.T) {
 		t.Fatalf("Unmarshal failed: %v", err)
 	}
 
+	if restored.Log.Level != original.Log.Level {
+		t.Errorf("Log.Level: got %q, want %q", restored.Log.Level, original.Log.Level)
+	}
+	if restored.Log.Path != original.Log.Path {
+		t.Errorf("Log.Path: got %q, want %q", restored.Log.Path, original.Log.Path)
+	}
 	if restored.DefaultProvider != original.DefaultProvider {
 		t.Errorf("DefaultProvider: got %q, want %q", restored.DefaultProvider, original.DefaultProvider)
 	}
@@ -67,6 +75,7 @@ func TestLoadConfig_ExplicitPath(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")
 	content := `{
+		"log": {"level": "warn", "path": "/tmp/test.log"},
 		"default_provider": "local",
 		"default_persona": "test",
 		"providers": {
@@ -249,10 +258,137 @@ func TestValidate_InvalidDefaultPersona(t *testing.T) {
 	}
 }
 
+func TestValidate_LogPathRequired(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	content := `{
+		"log": {"level": "warn"},
+		"default_provider": "local",
+		"default_persona": "test",
+		"providers": {"local": {"type": "ollama", "model": "gemma2"}},
+		"personas": {"test": {"display_name": "T", "system_prompt": "t", "memory_capacity": 100, "max_steps": 10}}
+	}`
+	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadConfig(configPath)
+	if err == nil {
+		t.Fatal("expected validation error for missing log.path")
+	}
+	if !strings.Contains(err.Error(), "log.path is required") {
+		t.Errorf("expected log.path error, got: %s", err.Error())
+	}
+}
+
+func TestValidate_LogLevelInvalid(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	content := `{
+		"log": {"level": "trace", "path": "/tmp/test.log"},
+		"default_provider": "local",
+		"default_persona": "test",
+		"providers": {"local": {"type": "ollama", "model": "gemma2"}},
+		"personas": {"test": {"display_name": "T", "system_prompt": "t", "memory_capacity": 100, "max_steps": 10}}
+	}`
+	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadConfig(configPath)
+	if err == nil {
+		t.Fatal("expected validation error for invalid log.level")
+	}
+	if !strings.Contains(err.Error(), "log.level must be one of") {
+		t.Errorf("expected log.level error, got: %s", err.Error())
+	}
+}
+
+func TestValidate_LogMissing(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	content := `{
+		"default_provider": "local",
+		"default_persona": "test",
+		"providers": {"local": {"type": "ollama", "model": "gemma2"}},
+		"personas": {"test": {"display_name": "T", "system_prompt": "t", "memory_capacity": 100, "max_steps": 10}}
+	}`
+	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadConfig(configPath)
+	if err == nil {
+		t.Fatal("expected validation error for missing log field")
+	}
+}
+
+func TestMergeConfig_LogLocalOverride(t *testing.T) {
+	base := &Config{
+		Log:             LogConfig{Level: "warn", Path: "/tmp/global.log"},
+		DefaultProvider: "global_p",
+		Providers:       map[string]ProviderConfig{"global_p": {Type: "ollama", Model: "gemma2"}},
+		Personas:        map[string]Persona{},
+	}
+	override := &Config{
+		Log:       LogConfig{Level: "debug", Path: "/tmp/local.log"},
+		Providers: map[string]ProviderConfig{},
+		Personas:  map[string]Persona{},
+	}
+
+	merged := mergeConfig(base, override)
+	if merged.Log.Level != "debug" {
+		t.Errorf("Log.Level: got %q, want %q", merged.Log.Level, "debug")
+	}
+	if merged.Log.Path != "/tmp/local.log" {
+		t.Errorf("Log.Path: got %q, want %q", merged.Log.Path, "/tmp/local.log")
+	}
+}
+
+func TestMergeConfig_LogBaseOnly(t *testing.T) {
+	base := &Config{
+		Log:       LogConfig{Level: "info", Path: "/tmp/global.log"},
+		Providers: map[string]ProviderConfig{},
+		Personas:  map[string]Persona{},
+	}
+	override := &Config{
+		Providers: map[string]ProviderConfig{},
+		Personas:  map[string]Persona{},
+	}
+
+	merged := mergeConfig(base, override)
+	if merged.Log.Level != "info" {
+		t.Errorf("Log.Level: got %q, want %q", merged.Log.Level, "info")
+	}
+	if merged.Log.Path != "/tmp/global.log" {
+		t.Errorf("Log.Path: got %q, want %q", merged.Log.Path, "/tmp/global.log")
+	}
+}
+
+func TestToSlogLevel(t *testing.T) {
+	tests := []struct {
+		input string
+		want  slog.Level
+	}{
+		{"debug", slog.LevelDebug},
+		{"info", slog.LevelInfo},
+		{"warn", slog.LevelWarn},
+		{"unknown", slog.LevelWarn},
+		{"", slog.LevelWarn},
+	}
+	for _, tt := range tests {
+		got := ToSlogLevel(tt.input)
+		if got != tt.want {
+			t.Errorf("ToSlogLevel(%q) = %v, want %v", tt.input, got, tt.want)
+		}
+	}
+}
+
 // writeTestConfig はテスト用の設定ファイルを書き出すヘルパー。
 func writeTestConfig(t *testing.T, path, defaultProvider, defaultPersona string, providers map[string]ProviderConfig, personas map[string]Persona) {
 	t.Helper()
 	cfg := Config{
+		Log:             LogConfig{Level: "warn", Path: "/tmp/test.log"},
 		DefaultProvider: defaultProvider,
 		DefaultPersona:  defaultPersona,
 		Providers:       providers,

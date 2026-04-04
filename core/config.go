@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 )
@@ -12,10 +13,17 @@ const defaultOrigin = "http://localhost:11434"
 
 // Config はアプリケーション全体の設定を保持する。
 type Config struct {
+	Log             LogConfig                 `json:"log"`
 	DefaultProvider string                    `json:"default_provider"`
 	DefaultPersona  string                    `json:"default_persona"`
 	Providers       map[string]ProviderConfig `json:"providers"`
 	Personas        map[string]Persona        `json:"personas"`
+}
+
+// LogConfig はログ出力の設定を保持する。
+type LogConfig struct {
+	Level string `json:"level"` // "debug", "info", "warn"
+	Path  string `json:"path"`  // ログ出力先ファイルパス
 }
 
 // ProviderConfig はLLMプロバイダの接続情報を表す。
@@ -120,6 +128,16 @@ func applyDefaults(cfg *Config) {
 }
 
 func validate(cfg *Config) error {
+	if cfg.Log.Path == "" {
+		return fmt.Errorf("log.path is required")
+	}
+	switch cfg.Log.Level {
+	case "debug", "info", "warn":
+		// valid
+	default:
+		return fmt.Errorf("log.level must be one of: debug, info, warn (got %q)", cfg.Log.Level)
+	}
+
 	if cfg.DefaultProvider != "" {
 		if _, ok := cfg.Providers[cfg.DefaultProvider]; !ok {
 			return fmt.Errorf("default_provider %q not found in providers", cfg.DefaultProvider)
@@ -133,8 +151,23 @@ func validate(cfg *Config) error {
 	return nil
 }
 
+// ToSlogLevel は設定ファイルのログレベル文字列を slog.Level に変換する。
+func ToSlogLevel(level string) slog.Level {
+	switch level {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn":
+		return slog.LevelWarn
+	default:
+		return slog.LevelWarn
+	}
+}
+
 func mergeConfig(base, override *Config) *Config {
 	merged := Config{
+		Log:             base.Log,
 		DefaultProvider: base.DefaultProvider,
 		DefaultPersona:  base.DefaultPersona,
 		Providers:       make(map[string]ProviderConfig, len(base.Providers)),
@@ -147,6 +180,9 @@ func mergeConfig(base, override *Config) *Config {
 		merged.Personas[k] = v
 	}
 
+	if override.Log.Path != "" {
+		merged.Log = override.Log
+	}
 	if override.DefaultProvider != "" {
 		merged.DefaultProvider = override.DefaultProvider
 	}
