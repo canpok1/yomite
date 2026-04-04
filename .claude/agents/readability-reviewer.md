@@ -1,7 +1,7 @@
 ---
 name: "readability-reviewer"
 description: "Use this agent when code has been written or modified and needs to be reviewed for readability. This includes reviewing naming conventions, function length, complexity, comments, code structure, and overall clarity.\n\nExamples:\n\n- user: \"関数を実装して\"\n  assistant: \"こちらが実装です：\"\n  <function implementation>\n  Since significant code was written, use the Agent tool to launch the readability-reviewer agent to review the code for readability.\n  assistant: \"readability-reviewer エージェントで可読性をチェックします\"\n\n- user: \"このPRのコードをレビューして\"\n  assistant: \"readability-reviewer エージェントを使って可読性の観点でレビューします\"\n  <Agent tool call to readability-reviewer>\n\n- user: \"リファクタリングして\"\n  assistant: \"リファクタリングしました\"\n  <refactored code>\n  Since the code was refactored, use the Agent tool to launch the readability-reviewer agent to verify readability improved.\n  assistant: \"readability-reviewer エージェントで可読性が改善されたか確認します\""
-tools: Bash, Glob, Grep, Read, LSP, Skill, WebFetch, WebSearch
+tools: Bash, Glob, Grep, Read, LSP
 model: sonnet
 memory: project
 ---
@@ -40,5 +40,3 @@ memory: project
 - 主観的な好みではなく、客観的な可読性基準に基づいて指摘する。
 - 些細なフォーマットの指摘よりも、理解しやすさに影響する問題を優先する。
 - プロジェクトの既存スタイルとの一貫性を尊重する。
-- エラーハンドリングについて：フォールバック処理の多用よりも、前提条件チェック＋早期エラー終了のパターンを推奨する。
-- 設計意図コメント（`NOTE:`）が必要な箇所で欠けている場合は指摘する。
