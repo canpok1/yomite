@@ -10,6 +10,7 @@ setup-gui:
 	cd frontend && npm install
 
 build-gui:
+	mkdir -p frontend/dist
 	wails build -tags gui -o $(BINARY_NAME)-gui
 
 clean:
