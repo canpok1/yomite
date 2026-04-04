@@ -26,6 +26,12 @@ go.work.sum
 
 # Build output
 /yomite
+/yomite-gui
+/build/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
 
 # env file
 .env
