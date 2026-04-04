@@ -7,6 +7,12 @@ ln -sf "${SCRIPT_DIR}/.tmux.conf" "${HOME}/.tmux.conf"
 
 curl -fsSL https://claude.ai/install.sh | bash
 
+# Wails CLIのインストール
+echo "Installing Wails CLI..."
+WAILS_VERSION=$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v2)
+go install "github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}"
+echo "Wails CLI installed."
+
 # .envテンプレートのコピー
 if [ ! -f "${SCRIPT_DIR}/.env" ]; then
   if [ -f "${SCRIPT_DIR}/.env-template" ]; then
