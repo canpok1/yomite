@@ -51,7 +51,8 @@ func collectSteps() (onStep func(SimulationStep) error, getSteps func() []Simula
 }
 
 func TestRunSimulation_NormalCompletion(t *testing.T) {
-	// 3文のドキュメントを順に読み、2文目でnilを返して終了
+	// 3文のドキュメントを順に読み、最後の文でnilを返して終了
+	// 各ステップで note + memory の2回呼び出し = 6レスポンス
 	doc := Document{
 		ID:      "test",
 		RawText: "文1。文2。文3。",
@@ -69,9 +70,18 @@ func TestRunSimulation_NormalCompletion(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: intPtr(1), Note: nil, Memory: "文1を読んだ"},
-			{CurrentIndex: 1, NextIndex: intPtr(2), Note: &Note{Type: NoteTypeQuestion, Content: "なぜ？"}, Memory: "文1と文2を読んだ"},
-			{CurrentIndex: 2, NextIndex: nil, Note: nil, Memory: "全部読んだ"},
+			// Step 0: note
+			{CurrentIndex: 0, NextIndex: intPtr(1), Note: nil},
+			// Step 0: memory
+			{Memory: "文1を読んだ"},
+			// Step 1: note
+			{CurrentIndex: 1, NextIndex: intPtr(2), Note: &Note{Type: NoteTypeQuestion, Content: "なぜ？"}},
+			// Step 1: memory
+			{Memory: "文1と文2を読んだ"},
+			// Step 2: note
+			{CurrentIndex: 2, NextIndex: nil, Note: nil},
+			// Step 2: memory
+			{Memory: "全部読んだ"},
 		},
 	}
 
@@ -131,10 +141,18 @@ func TestRunSimulation_MaxStepsTermination(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "m1"},
-			{CurrentIndex: 1, NextIndex: intPtr(0), Memory: "m2"},
-			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "m3"},
-			{CurrentIndex: 1, NextIndex: intPtr(0), Memory: "m4"},
+			// Step 0: note, memory
+			{CurrentIndex: 0, NextIndex: intPtr(1)},
+			{Memory: "m1"},
+			// Step 1: note, memory
+			{CurrentIndex: 1, NextIndex: intPtr(0)},
+			{Memory: "m2"},
+			// Step 2: note, memory
+			{CurrentIndex: 0, NextIndex: intPtr(1)},
+			{Memory: "m3"},
+			// Step 3 (won't reach): note, memory
+			{CurrentIndex: 1, NextIndex: intPtr(0)},
+			{Memory: "m4"},
 		},
 	}
 
@@ -166,10 +184,18 @@ func TestRunSimulation_DefaultMaxSteps(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: intPtr(0), Memory: "m1"},
-			{CurrentIndex: 0, NextIndex: intPtr(0), Memory: "m2"},
-			{CurrentIndex: 0, NextIndex: intPtr(0), Memory: "m3"},
-			{CurrentIndex: 0, NextIndex: intPtr(0), Memory: "m4"},
+			// Step 0: note, memory
+			{CurrentIndex: 0, NextIndex: intPtr(0)},
+			{Memory: "m1"},
+			// Step 1: note, memory
+			{CurrentIndex: 0, NextIndex: intPtr(0)},
+			{Memory: "m2"},
+			// Step 2: note, memory
+			{CurrentIndex: 0, NextIndex: intPtr(0)},
+			{Memory: "m3"},
+			// Step 3 (won't reach): note, memory
+			{CurrentIndex: 0, NextIndex: intPtr(0)},
+			{Memory: "m4"},
 		},
 	}
 
@@ -185,7 +211,7 @@ func TestRunSimulation_DefaultMaxSteps(t *testing.T) {
 	}
 }
 
-func TestRunSimulation_ProviderError(t *testing.T) {
+func TestRunSimulation_ProviderErrorOnNote(t *testing.T) {
 	doc := Document{
 		ID:      "test",
 		RawText: "文1。文2。",
@@ -202,11 +228,13 @@ func TestRunSimulation_ProviderError(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "m1"},
+			// Step 0: note, memory
+			{CurrentIndex: 0, NextIndex: intPtr(1)},
+			{Memory: "m1"},
 		},
 		errors: []error{
-			nil,
-			errors.New("LLM connection failed"),
+			nil, nil,
+			errors.New("LLM connection failed"), // Step 1 note fails
 		},
 	}
 
@@ -214,6 +242,43 @@ func TestRunSimulation_ProviderError(t *testing.T) {
 	err := RunSimulation(doc, persona, mock, discardLogger, onStep)
 	if err == nil {
 		t.Fatal("expected error from provider failure")
+	}
+	if !strings.Contains(err.Error(), "note") {
+		t.Errorf("error should mention note phase: %v", err)
+	}
+}
+
+func TestRunSimulation_ProviderErrorOnMemory(t *testing.T) {
+	doc := Document{
+		ID:      "test",
+		RawText: "文1。",
+		Sentences: []Sentence{
+			{Index: 0, Content: "文1。"},
+		},
+	}
+	persona := Persona{
+		DisplayName:    "テスト",
+		SystemPrompt:   "テスト用",
+		MemoryCapacity: 100,
+		MaxSteps:       10,
+	}
+	mock := &mockProvider{
+		responses: []SimulationResponse{
+			{CurrentIndex: 0, NextIndex: nil}, // note ok
+		},
+		errors: []error{
+			nil,
+			errors.New("LLM connection failed"), // memory fails
+		},
+	}
+
+	onStep, _ := collectSteps()
+	err := RunSimulation(doc, persona, mock, discardLogger, onStep)
+	if err == nil {
+		t.Fatal("expected error from provider failure")
+	}
+	if !strings.Contains(err.Error(), "memory") {
+		t.Errorf("error should mention memory phase: %v", err)
 	}
 }
 
@@ -234,7 +299,8 @@ func TestRunSimulation_OutOfRangeNextIndex(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: intPtr(99), Memory: "m1"},
+			{CurrentIndex: 0, NextIndex: intPtr(99)}, // note with bad index
+			{Memory: "m1"},                           // memory (won't be used)
 		},
 	}
 
@@ -265,7 +331,8 @@ func TestRunSimulation_MemoryCapacityLimit(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: nil, Memory: "これは長い記憶バッファです"},
+			{CurrentIndex: 0, NextIndex: nil}, // note
+			{Memory: "これは長い記憶バッファです"},         // memory
 		},
 	}
 
@@ -279,8 +346,9 @@ func TestRunSimulation_MemoryCapacityLimit(t *testing.T) {
 		t.Fatalf("expected 1 step, got %d", len(steps))
 	}
 
+	// 最初のnoteリクエストのmemoryは空
 	if mock.calls[0].Memory != "" {
-		t.Errorf("first request should have empty memory, got %q", mock.calls[0].Memory)
+		t.Errorf("first note request should have empty memory, got %q", mock.calls[0].Memory)
 	}
 }
 
@@ -301,8 +369,12 @@ func TestRunSimulation_MemoryCapacityAppliedToNextStep(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "あいうえお"},
-			{CurrentIndex: 1, NextIndex: nil, Memory: "ok"},
+			// Step 0
+			{CurrentIndex: 0, NextIndex: intPtr(1)}, // note
+			{Memory: "あいうえお"},                       // memory (will be truncated to 3 chars)
+			// Step 1
+			{CurrentIndex: 1, NextIndex: nil}, // note
+			{Memory: "ok"},                    // memory
 		},
 	}
 
@@ -312,11 +384,12 @@ func TestRunSimulation_MemoryCapacityAppliedToNextStep(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(mock.calls) < 2 {
-		t.Fatalf("expected at least 2 calls, got %d", len(mock.calls))
+	if len(mock.calls) < 3 {
+		t.Fatalf("expected at least 3 calls, got %d", len(mock.calls))
 	}
-	if mock.calls[1].Memory != "あいう" {
-		t.Errorf("second request memory should be truncated to 3 chars, got %q", mock.calls[1].Memory)
+	// Step 1のnoteリクエスト（calls[2]）のmemoryが切り詰められていること
+	if mock.calls[2].Memory != "あいう" {
+		t.Errorf("step 1 note request memory should be truncated to 3 chars, got %q", mock.calls[2].Memory)
 	}
 }
 
@@ -338,10 +411,18 @@ func TestRunSimulation_Backtracking(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "m1"},
-			{CurrentIndex: 1, NextIndex: intPtr(0), Memory: "m2"},
-			{CurrentIndex: 0, NextIndex: intPtr(2), Memory: "m3"},
-			{CurrentIndex: 2, NextIndex: nil, Memory: "m4"},
+			// Step 0: note, memory
+			{CurrentIndex: 0, NextIndex: intPtr(1)},
+			{Memory: "m1"},
+			// Step 1: note (backtrack), memory
+			{CurrentIndex: 1, NextIndex: intPtr(0)},
+			{Memory: "m2"},
+			// Step 2: note, memory
+			{CurrentIndex: 0, NextIndex: intPtr(2)},
+			{Memory: "m3"},
+			// Step 3: note (done), memory
+			{CurrentIndex: 2, NextIndex: nil},
+			{Memory: "m4"},
 		},
 	}
 
@@ -381,8 +462,12 @@ func TestRunSimulation_RequestFields(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "記憶1"},
-			{CurrentIndex: 1, NextIndex: nil, Memory: "記憶2"},
+			// Step 0: note, memory
+			{CurrentIndex: 0, NextIndex: intPtr(1)},
+			{Memory: "記憶1"},
+			// Step 1: note, memory
+			{CurrentIndex: 1, NextIndex: nil},
+			{Memory: "記憶2"},
 		},
 	}
 
@@ -392,36 +477,89 @@ func TestRunSimulation_RequestFields(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(mock.calls) != 2 {
-		t.Fatalf("expected 2 calls, got %d", len(mock.calls))
+	// 2 steps × 2 phases = 4 calls
+	if len(mock.calls) != 4 {
+		t.Fatalf("expected 4 calls, got %d", len(mock.calls))
 	}
 
-	req0 := mock.calls[0]
-	if req0.SystemPrompt != "あなたはテスト用AIです" {
-		t.Errorf("req0.SystemPrompt: got %q", req0.SystemPrompt)
+	// Step 0 note request (calls[0])
+	noteReq0 := mock.calls[0]
+	if noteReq0.Phase != PhaseNote {
+		t.Errorf("calls[0].Phase: got %d, want PhaseNote", noteReq0.Phase)
 	}
-	if req0.CurrentSentence != "文1。" {
-		t.Errorf("req0.CurrentSentence: got %q", req0.CurrentSentence)
+	if noteReq0.SystemPrompt != "あなたはテスト用AIです" {
+		t.Errorf("calls[0].SystemPrompt: got %q", noteReq0.SystemPrompt)
 	}
-	if req0.CurrentIndex != 0 {
-		t.Errorf("req0.CurrentIndex: got %d", req0.CurrentIndex)
+	if noteReq0.CurrentSentence != "文1。" {
+		t.Errorf("calls[0].CurrentSentence: got %q", noteReq0.CurrentSentence)
 	}
-	if req0.TotalSentences != 2 {
-		t.Errorf("req0.TotalSentences: got %d", req0.TotalSentences)
+	if noteReq0.CurrentIndex != 0 {
+		t.Errorf("calls[0].CurrentIndex: got %d", noteReq0.CurrentIndex)
 	}
-	if req0.Memory != "" {
-		t.Errorf("req0.Memory: got %q, want empty", req0.Memory)
+	if noteReq0.TotalSentences != 2 {
+		t.Errorf("calls[0].TotalSentences: got %d", noteReq0.TotalSentences)
+	}
+	if noteReq0.Memory != "" {
+		t.Errorf("calls[0].Memory: got %q, want empty", noteReq0.Memory)
 	}
 
-	req1 := mock.calls[1]
-	if req1.CurrentSentence != "文2。" {
-		t.Errorf("req1.CurrentSentence: got %q", req1.CurrentSentence)
+	// Step 0 memory request (calls[1])
+	memReq0 := mock.calls[1]
+	if memReq0.Phase != PhaseMemory {
+		t.Errorf("calls[1].Phase: got %d, want PhaseMemory", memReq0.Phase)
 	}
-	if req1.CurrentIndex != 1 {
-		t.Errorf("req1.CurrentIndex: got %d", req1.CurrentIndex)
+
+	// Step 1 note request (calls[2])
+	noteReq1 := mock.calls[2]
+	if noteReq1.Phase != PhaseNote {
+		t.Errorf("calls[2].Phase: got %d, want PhaseNote", noteReq1.Phase)
 	}
-	if req1.Memory != "記憶1" {
-		t.Errorf("req1.Memory: got %q, want %q", req1.Memory, "記憶1")
+	if noteReq1.CurrentSentence != "文2。" {
+		t.Errorf("calls[2].CurrentSentence: got %q", noteReq1.CurrentSentence)
+	}
+	if noteReq1.CurrentIndex != 1 {
+		t.Errorf("calls[2].CurrentIndex: got %d", noteReq1.CurrentIndex)
+	}
+	if noteReq1.Memory != "記憶1" {
+		t.Errorf("calls[2].Memory: got %q, want %q", noteReq1.Memory, "記憶1")
+	}
+}
+
+func TestRunSimulation_MemoryPhaseReceivesNote(t *testing.T) {
+	doc := Document{
+		ID:      "test",
+		RawText: "文1。",
+		Sentences: []Sentence{
+			{Index: 0, Content: "文1。"},
+		},
+	}
+	persona := Persona{
+		DisplayName:    "テスト",
+		SystemPrompt:   "テスト用",
+		MemoryCapacity: 100,
+		MaxSteps:       10,
+	}
+	expectedNote := &Note{Type: NoteTypeQuestion, Content: "なぜ？"}
+	mock := &mockProvider{
+		responses: []SimulationResponse{
+			{CurrentIndex: 0, NextIndex: nil, Note: expectedNote}, // note
+			{Memory: "m1"}, // memory
+		},
+	}
+
+	onStep, _ := collectSteps()
+	err := RunSimulation(doc, persona, mock, discardLogger, onStep)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// memory phase request should include the note from note phase
+	memReq := mock.calls[1]
+	if memReq.Note == nil {
+		t.Fatal("memory phase request should include note")
+	}
+	if memReq.Note.Type != NoteTypeQuestion || memReq.Note.Content != "なぜ？" {
+		t.Errorf("memory phase note: got %+v, want %+v", memReq.Note, expectedNote)
 	}
 }
 
@@ -465,7 +603,8 @@ func TestRunSimulation_NegativeNextIndex(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: intPtr(-1), Memory: "m1"},
+			{CurrentIndex: 0, NextIndex: intPtr(-1)}, // note with bad index
+			{Memory: "m1"},                           // memory (won't be reached)
 		},
 	}
 
@@ -500,8 +639,12 @@ func TestRunSimulation_LogOutput(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "m1"},
-			{CurrentIndex: 1, NextIndex: nil, Memory: "m2"},
+			// Step 0: note, memory
+			{CurrentIndex: 0, NextIndex: intPtr(1)},
+			{Memory: "m1"},
+			// Step 1: note, memory
+			{CurrentIndex: 1, NextIndex: nil},
+			{Memory: "m2"},
 		},
 	}
 
@@ -542,7 +685,8 @@ func TestRunSimulation_MemoryTruncationLog(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: nil, Memory: "あいうえお"},
+			{CurrentIndex: 0, NextIndex: nil}, // note
+			{Memory: "あいうえお"},                 // memory (will be truncated)
 		},
 	}
 
@@ -575,8 +719,12 @@ func TestRunSimulation_CallbackCalledPerStep(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "m1"},
-			{CurrentIndex: 1, NextIndex: nil, Memory: "m2"},
+			// Step 0: note, memory
+			{CurrentIndex: 0, NextIndex: intPtr(1)},
+			{Memory: "m1"},
+			// Step 1: note, memory
+			{CurrentIndex: 1, NextIndex: nil},
+			{Memory: "m2"},
 		},
 	}
 
@@ -615,8 +763,9 @@ func TestRunSimulation_CallbackError(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			{CurrentIndex: 0, NextIndex: intPtr(1), Memory: "m1"},
-			{CurrentIndex: 1, NextIndex: nil, Memory: "m2"},
+			// Step 0: note, memory
+			{CurrentIndex: 0, NextIndex: intPtr(1)},
+			{Memory: "m1"},
 		},
 	}
 
@@ -634,8 +783,8 @@ func TestRunSimulation_CallbackError(t *testing.T) {
 	if !errors.Is(err, callbackErr) {
 		t.Errorf("expected callback error to be wrapped, got: %v", err)
 	}
-	// プロバイダは1回だけ呼ばれる（コールバックエラーで中断）
-	if mock.callIdx != 1 {
-		t.Errorf("expected provider to be called once, got %d", mock.callIdx)
+	// note + memory の2回呼ばれた後にコールバックエラーで中断
+	if mock.callIdx != 2 {
+		t.Errorf("expected provider to be called twice (note + memory), got %d", mock.callIdx)
 	}
 }

@@ -43,21 +43,16 @@ func TestOllamaProvider_ImplementsProvider(t *testing.T) {
 	var _ Provider = (*OllamaProvider)(nil)
 }
 
-func TestOllamaProvider_Execute_Success(t *testing.T) {
+func TestOllamaProvider_Execute_NotePhase(t *testing.T) {
 	nextIdx := 1
-	simResp := SimulationResponse{
-		CurrentIndex: 0,
-		NextIndex:    &nextIdx,
-		Note:         nil,
-		Memory:       "テスト記憶",
-	}
-	simRespJSON, _ := json.Marshal(simResp)
+	content := `{"current_index": 0, "next_index": 1, "note": null}`
 
-	server := newOllamaChatServer(string(simRespJSON))
+	server := newOllamaChatServer(content)
 	defer server.Close()
 
 	p := NewOllamaProvider(server.URL, "gemma2")
 	req := SimulationRequest{
+		Phase:           PhaseNote,
 		SystemPrompt:    "あなたは初学者です。",
 		CurrentSentence: "これはテスト文です。",
 		CurrentIndex:    0,
@@ -73,9 +68,33 @@ func TestOllamaProvider_Execute_Success(t *testing.T) {
 	if got.CurrentIndex != 0 {
 		t.Errorf("CurrentIndex: got %d, want 0", got.CurrentIndex)
 	}
-	if got.NextIndex == nil || *got.NextIndex != 1 {
-		t.Errorf("NextIndex: got %v, want 1", got.NextIndex)
+	if got.NextIndex == nil || *got.NextIndex != nextIdx {
+		t.Errorf("NextIndex: got %v, want %d", got.NextIndex, nextIdx)
 	}
+}
+
+func TestOllamaProvider_Execute_MemoryPhase(t *testing.T) {
+	content := `{"memory": "テスト記憶"}`
+
+	server := newOllamaChatServer(content)
+	defer server.Close()
+
+	p := NewOllamaProvider(server.URL, "gemma2")
+	req := SimulationRequest{
+		Phase:           PhaseMemory,
+		SystemPrompt:    "あなたは初学者です。",
+		CurrentSentence: "これはテスト文です。",
+		CurrentIndex:    0,
+		TotalSentences:  3,
+		Memory:          "",
+		MemoryCapacity:  100,
+	}
+
+	got, err := p.Execute(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	if got.Memory != "テスト記憶" {
 		t.Errorf("Memory: got %q, want %q", got.Memory, "テスト記憶")
 	}

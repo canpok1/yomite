@@ -93,8 +93,9 @@ func TestBuildPromptSystemPrompt(t *testing.T) {
 	}
 }
 
-func TestBuildPromptUserMessageContainsJSONFormat(t *testing.T) {
+func TestBuildNotePromptContainsJSONFormat(t *testing.T) {
 	req := SimulationRequest{
+		Phase:           PhaseNote,
 		SystemPrompt:    "あなたは初学者の読者です。",
 		CurrentSentence: "テスト文。",
 		CurrentIndex:    0,
@@ -102,9 +103,8 @@ func TestBuildPromptUserMessageContainsJSONFormat(t *testing.T) {
 		Memory:          "",
 	}
 
-	_, user := BuildPrompt(req)
+	_, user := BuildNotePrompt(req)
 
-	// JSONフォーマット指示が含まれることを確認
 	if !strings.Contains(user, "current_index") {
 		t.Error("user message should contain current_index field instruction")
 	}
@@ -114,16 +114,39 @@ func TestBuildPromptUserMessageContainsJSONFormat(t *testing.T) {
 	if !strings.Contains(user, "note") {
 		t.Error("user message should contain note field instruction")
 	}
+	if !strings.Contains(user, "JSON") {
+		t.Error("user message should mention JSON format")
+	}
+}
+
+func TestBuildMemoryPromptContainsJSONFormat(t *testing.T) {
+	req := SimulationRequest{
+		Phase:           PhaseMemory,
+		SystemPrompt:    "あなたは初学者の読者です。",
+		CurrentSentence: "テスト文。",
+		CurrentIndex:    0,
+		TotalSentences:  5,
+		Memory:          "",
+		MemoryCapacity:  100,
+		Note:            &Note{Type: NoteTypeQuestion, Content: "テスト感想"},
+	}
+
+	_, user := BuildMemoryPrompt(req)
+
 	if !strings.Contains(user, "memory") {
 		t.Error("user message should contain memory field instruction")
 	}
 	if !strings.Contains(user, "JSON") {
 		t.Error("user message should mention JSON format")
 	}
+	if !strings.Contains(user, "テスト感想") {
+		t.Error("user message should contain note content")
+	}
 }
 
-func TestBuildPromptUserMessageContainsContext(t *testing.T) {
+func TestBuildNotePromptContainsContext(t *testing.T) {
 	req := SimulationRequest{
+		Phase:           PhaseNote,
 		SystemPrompt:    "あなたは初学者の読者です。",
 		CurrentSentence: "これはテスト文です。",
 		CurrentIndex:    2,
@@ -131,7 +154,7 @@ func TestBuildPromptUserMessageContainsContext(t *testing.T) {
 		Memory:          "前の文で重要な概念が出た。",
 	}
 
-	_, user := BuildPrompt(req)
+	_, user := BuildNotePrompt(req)
 
 	if !strings.Contains(user, req.CurrentSentence) {
 		t.Error("user message should contain current sentence")
@@ -147,8 +170,9 @@ func TestBuildPromptUserMessageContainsContext(t *testing.T) {
 	}
 }
 
-func TestBuildPromptEmptyMemory(t *testing.T) {
+func TestBuildNotePromptEmptyMemory(t *testing.T) {
 	req := SimulationRequest{
+		Phase:           PhaseNote,
 		SystemPrompt:    "あなたは初学者の読者です。",
 		CurrentSentence: "テスト文。",
 		CurrentIndex:    0,
@@ -156,15 +180,73 @@ func TestBuildPromptEmptyMemory(t *testing.T) {
 		Memory:          "",
 	}
 
-	_, user := BuildPrompt(req)
+	_, user := BuildNotePrompt(req)
 
-	// 空の記憶でもエラーなくプロンプトが生成されることを確認
 	if user == "" {
 		t.Error("user message should not be empty even with empty memory")
 	}
 }
 
-func TestParseResponseValid(t *testing.T) {
+func TestBuildMemoryPromptContainsContext(t *testing.T) {
+	req := SimulationRequest{
+		Phase:           PhaseMemory,
+		SystemPrompt:    "あなたは初学者の読者です。",
+		CurrentSentence: "これはテスト文です。",
+		CurrentIndex:    2,
+		TotalSentences:  10,
+		Memory:          "前の文で重要な概念が出た。",
+		MemoryCapacity:  100,
+		Note:            nil,
+	}
+
+	_, user := BuildMemoryPrompt(req)
+
+	if !strings.Contains(user, req.CurrentSentence) {
+		t.Error("user message should contain current sentence")
+	}
+	if !strings.Contains(user, req.Memory) {
+		t.Error("user message should contain memory")
+	}
+	if !strings.Contains(user, "（なし）") {
+		t.Error("user message should contain '（なし）' for nil note")
+	}
+}
+
+func TestParseMemoryResponseValid(t *testing.T) {
+	input := `{"memory": "第3文で認知科学が定義された。"}`
+
+	resp, err := ParseMemoryResponse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.Memory != "第3文で認知科学が定義された。" {
+		t.Errorf("Memory: got %q", resp.Memory)
+	}
+}
+
+func TestParseMemoryResponseInvalidJSON(t *testing.T) {
+	_, err := ParseMemoryResponse("not json")
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+	if !isErrInvalidJSON(err) {
+		t.Errorf("expected ErrInvalidJSON, got %T: %v", err, err)
+	}
+}
+
+func TestParseMemoryResponseMarkdownCodeBlock(t *testing.T) {
+	input := "```json\n{\"memory\": \"テスト記憶\"}\n```"
+
+	resp, err := ParseMemoryResponse(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.Memory != "テスト記憶" {
+		t.Errorf("Memory: got %q, want %q", resp.Memory, "テスト記憶")
+	}
+}
+
+func TestParseNoteResponse_Valid(t *testing.T) {
 	input := `{
 		"current_index": 5,
 		"next_index": 6,
@@ -172,7 +254,7 @@ func TestParseResponseValid(t *testing.T) {
 		"memory": "第3文で認知科学が定義された。"
 	}`
 
-	resp, err := ParseResponse(input, 10)
+	resp, err := ParseNoteResponse(input, 10)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -185,15 +267,12 @@ func TestParseResponseValid(t *testing.T) {
 	if resp.Note == nil || resp.Note.Type != NoteTypeQuestion {
 		t.Errorf("Note.Type: got %v, want QUESTION", resp.Note)
 	}
-	if resp.Memory != "第3文で認知科学が定義された。" {
-		t.Errorf("Memory: got %q", resp.Memory)
-	}
 }
 
-func TestParseResponseNullFields(t *testing.T) {
+func TestParseNoteResponse_NullFields(t *testing.T) {
 	input := `{"current_index": 3, "next_index": null, "note": null, "memory": ""}`
 
-	resp, err := ParseResponse(input, 10)
+	resp, err := ParseNoteResponse(input, 10)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -205,8 +284,8 @@ func TestParseResponseNullFields(t *testing.T) {
 	}
 }
 
-func TestParseResponseInvalidJSON(t *testing.T) {
-	_, err := ParseResponse("not json at all", 10)
+func TestParseNoteResponse_InvalidJSON(t *testing.T) {
+	_, err := ParseNoteResponse("not json at all", 10)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
@@ -215,8 +294,8 @@ func TestParseResponseInvalidJSON(t *testing.T) {
 	}
 }
 
-func TestParseResponseEmptyString(t *testing.T) {
-	_, err := ParseResponse("", 10)
+func TestParseNoteResponse_EmptyString(t *testing.T) {
+	_, err := ParseNoteResponse("", 10)
 	if err == nil {
 		t.Fatal("expected error for empty string")
 	}
@@ -225,10 +304,10 @@ func TestParseResponseEmptyString(t *testing.T) {
 	}
 }
 
-func TestParseResponseCurrentIndexOutOfRange(t *testing.T) {
+func TestParseNoteResponse_CurrentIndexOutOfRange(t *testing.T) {
 	input := `{"current_index": 10, "next_index": 0, "note": null, "memory": ""}`
 
-	_, err := ParseResponse(input, 10) // totalSentences=10, valid range 0-9
+	_, err := ParseNoteResponse(input, 10) // totalSentences=10, valid range 0-9
 	if err == nil {
 		t.Fatal("expected error for out-of-range current_index")
 	}
@@ -237,12 +316,12 @@ func TestParseResponseCurrentIndexOutOfRange(t *testing.T) {
 	}
 }
 
-func TestParseResponseNextIndexEqualsTotalSentences(t *testing.T) {
+func TestParseNoteResponse_NextIndexEqualsTotalSentences(t *testing.T) {
 	// NOTE: next_index == totalSentences はLLMが最終文の次へ進もうとしたケース。
 	// 範囲外エラーではなく読了（nil）として扱う。
 	input := `{"current_index": 9, "next_index": 10, "note": null, "memory": ""}`
 
-	resp, err := ParseResponse(input, 10)
+	resp, err := ParseNoteResponse(input, 10)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -251,10 +330,10 @@ func TestParseResponseNextIndexEqualsTotalSentences(t *testing.T) {
 	}
 }
 
-func TestParseResponseNextIndexOutOfRange(t *testing.T) {
+func TestParseNoteResponse_NextIndexOutOfRange(t *testing.T) {
 	input := `{"current_index": 0, "next_index": 11, "note": null, "memory": ""}`
 
-	_, err := ParseResponse(input, 10)
+	_, err := ParseNoteResponse(input, 10)
 	if err == nil {
 		t.Fatal("expected error for out-of-range next_index")
 	}
@@ -263,10 +342,10 @@ func TestParseResponseNextIndexOutOfRange(t *testing.T) {
 	}
 }
 
-func TestParseResponseNegativeNextIndex(t *testing.T) {
+func TestParseNoteResponse_NegativeNextIndex(t *testing.T) {
 	input := `{"current_index": 0, "next_index": -1, "note": null, "memory": ""}`
 
-	_, err := ParseResponse(input, 10)
+	_, err := ParseNoteResponse(input, 10)
 	if err == nil {
 		t.Fatal("expected error for negative next_index")
 	}
@@ -275,10 +354,10 @@ func TestParseResponseNegativeNextIndex(t *testing.T) {
 	}
 }
 
-func TestParseResponseMarkdownCodeBlock(t *testing.T) {
+func TestParseNoteResponse_MarkdownCodeBlock(t *testing.T) {
 	input := "```json\n{\"current_index\": 0, \"next_index\": 1, \"note\": null, \"memory\": null}\n```"
 
-	resp, err := ParseResponse(input, 5)
+	resp, err := ParseNoteResponse(input, 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -290,10 +369,10 @@ func TestParseResponseMarkdownCodeBlock(t *testing.T) {
 	}
 }
 
-func TestParseResponseMarkdownCodeBlockNoLang(t *testing.T) {
+func TestParseNoteResponse_MarkdownCodeBlockNoLang(t *testing.T) {
 	input := "```\n{\"current_index\": 0, \"next_index\": 1, \"note\": null, \"memory\": null}\n```"
 
-	resp, err := ParseResponse(input, 5)
+	resp, err := ParseNoteResponse(input, 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

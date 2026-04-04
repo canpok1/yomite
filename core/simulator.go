@@ -3,7 +3,6 @@ package core
 import (
 	"fmt"
 	"log/slog"
-	"unicode/utf8"
 )
 
 // RunSimulation はドキュメントに対してAI読者シミュレーションを実行する。
@@ -31,7 +30,9 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 	completedSteps := 0
 
 	for step := 0; step < maxSteps; step++ {
-		req := SimulationRequest{
+		// Phase 1: 感想生成（note + next_index）
+		noteReq := SimulationRequest{
+			Phase:           PhaseNote,
 			SystemPrompt:    persona.SystemPrompt,
 			CurrentSentence: doc.Sentences[currentIdx].Content,
 			CurrentIndex:    currentIdx,
@@ -40,15 +41,33 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 			MemoryCapacity:  persona.MemoryCapacity,
 		}
 
-		resp, err := provider.Execute(req)
+		noteResp, err := provider.Execute(noteReq)
 		if err != nil {
-			return fmt.Errorf("step %d: provider error: %w", step, err)
+			return fmt.Errorf("step %d (note): provider error: %w", step, err)
 		}
 
-		var nextIdx int
-		hasNext := resp.NextIndex != nil
+		// Phase 2: メモリ生成（memory）
+		memReq := SimulationRequest{
+			Phase:           PhaseMemory,
+			SystemPrompt:    persona.SystemPrompt,
+			CurrentSentence: doc.Sentences[currentIdx].Content,
+			CurrentIndex:    currentIdx,
+			TotalSentences:  totalSentences,
+			Memory:          memory,
+			MemoryCapacity:  persona.MemoryCapacity,
+			Note:            noteResp.Note,
+		}
+
+		memResp, err := provider.Execute(memReq)
+		if err != nil {
+			return fmt.Errorf("step %d (memory): provider error: %w", step, err)
+		}
+
+		// NOTE: next_index の範囲検証は ParseNoteResponse でも実施済みだが、
+		// Provider 実装が ParseNoteResponse を経由しない場合に備えた防御的チェック。
+		hasNext := noteResp.NextIndex != nil
 		if hasNext {
-			nextIdx = *resp.NextIndex
+			nextIdx := *noteResp.NextIndex
 			if nextIdx < 0 || nextIdx >= totalSentences {
 				return &ErrIndexOutOfRange{
 					Field: "next_index",
@@ -57,14 +76,12 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 				}
 			}
 		}
-		// NOTE: ParseResponse が next_index==totalSentences を nil に変換済みなので
-		// ここでは追加の境界補正は不要。
 
 		s := SimulationStep{
 			Step:        step,
 			SentenceIdx: currentIdx,
-			TargetIdx:   resp.NextIndex,
-			Note:        resp.Note,
+			TargetIdx:   noteResp.NextIndex,
+			Note:        noteResp.Note,
 		}
 		if err := onStep(s); err != nil {
 			return fmt.Errorf("step %d: callback error: %w", step, err)
@@ -74,13 +91,14 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 		logger.Info("step completed",
 			"step", step,
 			"current_index", currentIdx,
-			"next_index", resp.NextIndex,
+			"next_index", noteResp.NextIndex,
 		)
 
-		memory = resp.Memory
-		memoryLen := utf8.RuneCountInString(memory)
+		memory = memResp.Memory
+		runes := []rune(memory)
+		memoryLen := len(runes)
 		if persona.MemoryCapacity > 0 && memoryLen > persona.MemoryCapacity {
-			memory = string([]rune(memory)[:persona.MemoryCapacity])
+			memory = string(runes[:persona.MemoryCapacity])
 			logger.Warn("memory truncated",
 				"step", step,
 				"original_length", memoryLen,
@@ -92,7 +110,7 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 			break
 		}
 
-		currentIdx = nextIdx
+		currentIdx = *noteResp.NextIndex
 	}
 
 	logger.Info("simulation finished",
