@@ -10,7 +10,7 @@ setup-gui:
 	cd frontend && npm install
 
 build-gui:
-	mkdir -p frontend/dist
+	mkdir -p frontend/dist && touch frontend/dist/.gitkeep
 	wails build -tags gui -o $(BINARY_NAME)-gui
 
 clean:
