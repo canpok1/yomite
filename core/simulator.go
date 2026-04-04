@@ -6,11 +6,13 @@ import (
 	"unicode/utf8"
 )
 
-// RunSimulation はドキュメントに対してAI読者シミュレーションを実行し、全ステップを返す。
-func RunSimulation(doc Document, persona Persona, provider Provider, logger *slog.Logger) ([]SimulationStep, error) {
+// RunSimulation はドキュメントに対してAI読者シミュレーションを実行する。
+// 各ステップが完了するたびに onStep コールバックを呼び出し、結果を逐次的に返す。
+// onStep がエラーを返した場合、シミュレーションを中断しそのエラーを返す。
+func RunSimulation(doc Document, persona Persona, provider Provider, logger *slog.Logger, onStep func(SimulationStep) error) error {
 	totalSentences := len(doc.Sentences)
 	if totalSentences == 0 {
-		return nil, nil
+		return nil
 	}
 
 	maxSteps := persona.MaxSteps
@@ -24,9 +26,9 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 		"max_steps", maxSteps,
 	)
 
-	steps := make([]SimulationStep, 0, maxSteps)
 	var memory string
 	currentIdx := 0
+	completedSteps := 0
 
 	for step := 0; step < maxSteps; step++ {
 		req := SimulationRequest{
@@ -39,7 +41,7 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 
 		resp, err := provider.Execute(req)
 		if err != nil {
-			return nil, fmt.Errorf("step %d: provider error: %w", step, err)
+			return fmt.Errorf("step %d: provider error: %w", step, err)
 		}
 
 		var nextIdx int
@@ -47,7 +49,7 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 		if hasNext {
 			nextIdx = *resp.NextIndex
 			if nextIdx < 0 || nextIdx >= totalSentences {
-				return nil, &ErrIndexOutOfRange{
+				return &ErrIndexOutOfRange{
 					Field: "next_index",
 					Index: nextIdx,
 					Max:   totalSentences,
@@ -57,12 +59,16 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 		// NOTE: ParseResponse が next_index==totalSentences を nil に変換済みなので
 		// ここでは追加の境界補正は不要。
 
-		steps = append(steps, SimulationStep{
+		s := SimulationStep{
 			Step:        step,
 			SentenceIdx: currentIdx,
 			TargetIdx:   resp.NextIndex,
 			Note:        resp.Note,
-		})
+		}
+		if err := onStep(s); err != nil {
+			return fmt.Errorf("step %d: callback error: %w", step, err)
+		}
+		completedSteps++
 
 		logger.Info("step completed",
 			"step", step,
@@ -70,7 +76,6 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 			"next_index", resp.NextIndex,
 		)
 
-		// 記憶バッファを更新（memory_capacity で文字数制限）
 		memory = resp.Memory
 		memoryLen := utf8.RuneCountInString(memory)
 		if persona.MemoryCapacity > 0 && memoryLen > persona.MemoryCapacity {
@@ -90,8 +95,8 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 	}
 
 	logger.Info("simulation finished",
-		"total_steps", len(steps),
+		"total_steps", completedSteps,
 	)
 
-	return steps, nil
+	return nil
 }

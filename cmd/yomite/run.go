@@ -117,57 +117,63 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	provider := core.NewLoggingProvider(providerFactory(providerCfg), logger)
 
-	steps, err := core.RunSimulation(doc, persona, provider, logger)
-	if err != nil {
+	onStep := func(s core.SimulationStep) error {
+		if jsonOutput {
+			return outputStepJSON(stdout, s)
+		}
+		return outputStepText(stdout, s, doc)
+	}
+
+	if err := core.RunSimulation(doc, persona, provider, logger, onStep); err != nil {
 		_, _ = fmt.Fprintf(stderr, "エラー: シミュレーション実行に失敗しました: %v\n", err)
 		return 1
 	}
 
-	if jsonOutput {
-		return outputJSON(stdout, stderr, steps)
-	}
-	return outputText(stdout, steps, doc)
-}
-
-func outputJSON(stdout io.Writer, stderr io.Writer, steps []core.SimulationStep) int {
-	enc := json.NewEncoder(stdout)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(steps); err != nil {
-		_, _ = fmt.Fprintf(stderr, "エラー: JSON出力に失敗しました: %v\n", err)
-		return 1
-	}
 	return 0
 }
 
-func outputText(stdout io.Writer, steps []core.SimulationStep, doc core.Document) int {
-	for _, s := range steps {
-		sentence := ""
-		if s.SentenceIdx >= 0 && s.SentenceIdx < len(doc.Sentences) {
-			sentence = doc.Sentences[s.SentenceIdx].Content
-		}
-
-		direction := ""
-		if s.TargetIdx != nil {
-			target := *s.TargetIdx
-			switch {
-			case target > s.SentenceIdx:
-				direction = fmt.Sprintf("→ 先読み (→%d)", target)
-			case target < s.SentenceIdx:
-				direction = fmt.Sprintf("← 読み返し (→%d)", target)
-			default:
-				direction = fmt.Sprintf("● 再読 (→%d)", target)
-			}
-		} else {
-			direction = "■ 読了"
-		}
-
-		_, _ = fmt.Fprintf(stdout, "[Step %d] 文%d: %s\n", s.Step, s.SentenceIdx, sentence)
-
-		if s.Note != nil {
-			_, _ = fmt.Fprintf(stdout, "  Note[%s]: %s\n", s.Note.Type, s.Note.Content)
-		}
-
-		_, _ = fmt.Fprintf(stdout, "  %s\n", direction)
+// outputStepJSON は1ステップをJSON Lines形式で出力する。
+func outputStepJSON(w io.Writer, s core.SimulationStep) error {
+	data, err := json.Marshal(s)
+	if err != nil {
+		return err
 	}
-	return 0
+	_, err = fmt.Fprintf(w, "%s\n", data)
+	return err
+}
+
+// outputStepText は1ステップをテキスト形式で出力する。
+func outputStepText(w io.Writer, s core.SimulationStep, doc core.Document) error {
+	sentence := ""
+	if s.SentenceIdx >= 0 && s.SentenceIdx < len(doc.Sentences) {
+		sentence = doc.Sentences[s.SentenceIdx].Content
+	}
+
+	direction := ""
+	if s.TargetIdx != nil {
+		target := *s.TargetIdx
+		switch {
+		case target > s.SentenceIdx:
+			direction = fmt.Sprintf("→ 先読み (→%d)", target)
+		case target < s.SentenceIdx:
+			direction = fmt.Sprintf("← 読み返し (→%d)", target)
+		default:
+			direction = fmt.Sprintf("● 再読 (→%d)", target)
+		}
+	} else {
+		direction = "■ 読了"
+	}
+
+	if _, err := fmt.Fprintf(w, "[Step %d] 文%d: %s\n", s.Step, s.SentenceIdx, sentence); err != nil {
+		return err
+	}
+
+	if s.Note != nil {
+		if _, err := fmt.Fprintf(w, "  Note[%s]: %s\n", s.Note.Type, s.Note.Content); err != nil {
+			return err
+		}
+	}
+
+	_, err := fmt.Fprintf(w, "  %s\n", direction)
+	return err
 }

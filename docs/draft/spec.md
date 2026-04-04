@@ -223,7 +223,7 @@ type Note struct {
 | `-f` | 入力テキストファイルのパス |
 | `--provider` | 使用するプロバイダIDを指定（未指定時は `default_provider`） |
 | `--persona` | 使用するペルソナIDを指定（未指定時は `default_persona`） |
-| `--json` | 出力をJSON形式に切替 |
+| `--json` | 出力をJSON Lines形式に切替（1ステップ1行） |
 | `--config` | config.jsonのパスを明示指定 |
 
 ### 5.3 設定管理

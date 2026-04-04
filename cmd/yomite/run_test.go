@@ -149,17 +149,25 @@ func TestRun_Integration_JSONOutput(t *testing.T) {
 		t.Fatalf("expected exit code 0, got %d; stderr: %s", code, stderr.String())
 	}
 
-	var steps []core.SimulationStep
-	if err := json.Unmarshal(stdout.Bytes(), &steps); err != nil {
-		t.Fatalf("invalid JSON: %v; output: %s", err, stdout.String())
+	// JSON Lines形式: 1行1JSONオブジェクト
+	lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 JSON Lines, got %d; output: %s", len(lines), stdout.String())
 	}
-	if len(steps) != 2 {
-		t.Fatalf("expected 2 steps, got %d", len(steps))
+
+	var step0 core.SimulationStep
+	if err := json.Unmarshal([]byte(lines[0]), &step0); err != nil {
+		t.Fatalf("invalid JSON on line 0: %v; line: %s", err, lines[0])
 	}
-	if steps[0].TargetIdx == nil || *steps[0].TargetIdx != 1 {
+	if step0.TargetIdx == nil || *step0.TargetIdx != 1 {
 		t.Errorf("expected target_idx=1 in step 0")
 	}
-	if steps[1].TargetIdx != nil {
+
+	var step1 core.SimulationStep
+	if err := json.Unmarshal([]byte(lines[1]), &step1); err != nil {
+		t.Fatalf("invalid JSON on line 1: %v; line: %s", err, lines[1])
+	}
+	if step1.TargetIdx != nil {
 		t.Errorf("expected nil target_idx in step 1")
 	}
 }
@@ -225,45 +233,59 @@ func TestRun_PersonaNotFound(t *testing.T) {
 	}
 }
 
-func TestOutputJSON(t *testing.T) {
-	steps := []core.SimulationStep{
-		{
-			Step:        0,
-			SentenceIdx: 0,
-			TargetIdx:   intPtr(1),
-			Note:        &core.Note{Type: core.NoteTypeQuestion, Content: "テスト疑問"},
-		},
-		{
-			Step:        1,
-			SentenceIdx: 1,
-			TargetIdx:   nil,
-			Note:        nil,
-		},
+func TestOutputStepJSON(t *testing.T) {
+	step := core.SimulationStep{
+		Step:        0,
+		SentenceIdx: 0,
+		TargetIdx:   intPtr(1),
+		Note:        &core.Note{Type: core.NoteTypeQuestion, Content: "テスト疑問"},
 	}
 
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	code := outputJSON(&stdout, &stderr, steps)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
+	var buf bytes.Buffer
+	if err := outputStepJSON(&buf, step); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var result []core.SimulationStep
-	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
-		t.Fatalf("invalid JSON output: %v", err)
+	output := strings.TrimSpace(buf.String())
+	var result core.SimulationStep
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("invalid JSON output: %v; output: %s", err, output)
 	}
-	if len(result) != 2 {
-		t.Fatalf("expected 2 steps, got %d", len(result))
+	if result.Note == nil || result.Note.Type != core.NoteTypeQuestion {
+		t.Errorf("expected QUESTION note")
 	}
-	if result[0].Note == nil || result[0].Note.Type != core.NoteTypeQuestion {
-		t.Errorf("expected QUESTION note in step 0")
-	}
-	if result[1].TargetIdx != nil {
-		t.Errorf("expected nil target_idx in step 1")
+	if result.TargetIdx == nil || *result.TargetIdx != 1 {
+		t.Errorf("expected target_idx=1")
 	}
 }
 
-func TestOutputText(t *testing.T) {
+func TestOutputStepJSON_NilFields(t *testing.T) {
+	step := core.SimulationStep{
+		Step:        1,
+		SentenceIdx: 1,
+		TargetIdx:   nil,
+		Note:        nil,
+	}
+
+	var buf bytes.Buffer
+	if err := outputStepJSON(&buf, step); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	output := strings.TrimSpace(buf.String())
+	var result core.SimulationStep
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		t.Fatalf("invalid JSON output: %v", err)
+	}
+	if result.TargetIdx != nil {
+		t.Errorf("expected nil target_idx")
+	}
+	if result.Note != nil {
+		t.Errorf("expected nil note")
+	}
+}
+
+func TestOutputStepText(t *testing.T) {
 	doc := core.Document{
 		ID:      "test",
 		RawText: "文1。文2。",
@@ -295,9 +317,10 @@ func TestOutputText(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	code := outputText(&stdout, steps, doc)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
+	for _, s := range steps {
+		if err := outputStepText(&stdout, s, doc); err != nil {
+			t.Fatalf("unexpected error at step %d: %v", s.Step, err)
+		}
 	}
 
 	output := stdout.String()
@@ -327,25 +350,22 @@ func TestOutputText(t *testing.T) {
 	}
 }
 
-func TestOutputText_Reread(t *testing.T) {
+func TestOutputStepText_Reread(t *testing.T) {
 	doc := core.Document{
 		Sentences: []core.Sentence{
 			{Index: 0, Content: "テスト。"},
 		},
 	}
 
-	steps := []core.SimulationStep{
-		{
-			Step:        0,
-			SentenceIdx: 0,
-			TargetIdx:   intPtr(0),
-		},
+	step := core.SimulationStep{
+		Step:        0,
+		SentenceIdx: 0,
+		TargetIdx:   intPtr(0),
 	}
 
 	var stdout bytes.Buffer
-	code := outputText(&stdout, steps, doc)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
+	if err := outputStepText(&stdout, step, doc); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 	if !strings.Contains(stdout.String(), "再読") {
 		t.Errorf("expected reread direction, got: %s", stdout.String())
