@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Editor } from "./components/Editor";
 import { SentenceList } from "./components/SentenceList";
+import { GazeArrows } from "./components/GazeArrows";
 import { ConfigPanel } from "./components/ConfigPanel";
 import { useSimulation, type SimulationStatus } from "./hooks/useSimulation";
 import { LoadDocument } from "../wailsjs/go/gui/App";
@@ -29,6 +30,7 @@ function App() {
   const [sentences, setSentences] = useState<Sentence[]>([]);
   const [showConfig, setShowConfig] = useState(false);
   const simulation = useSimulation();
+  const sentenceListRef = useRef<HTMLDivElement>(null);
 
   const isResultView = sentences.length > 0 && simulation.status !== "idle";
 
@@ -101,8 +103,9 @@ function App() {
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto relative" ref={sentenceListRef}>
             <SentenceList sentences={sentences} steps={simulation.steps} isRunning={simulation.status === "running"} />
+            <GazeArrows steps={simulation.steps} containerRef={sentenceListRef} />
           </div>
         </div>
       ) : (
