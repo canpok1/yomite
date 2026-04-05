@@ -384,6 +384,55 @@ func TestToSlogLevel(t *testing.T) {
 	}
 }
 
+// TODO: TestSaveConfig_RoundTrip — 保存して読み戻せる
+// TODO: TestSaveConfig_ValidationError — 不正な設定で保存失敗
+// TODO: TestSaveConfig_CreatesParentDir — 親ディレクトリ自動作成
+// TODO: TestSaveConfig_AppliesDefaults — Origin未設定時にデフォルト適用
+
+func TestSaveConfig_RoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+
+	cfg := Config{
+		Log:             LogConfig{Level: "info", Path: "/tmp/test.log"},
+		DefaultProvider: "local",
+		DefaultPersona:  "test",
+		Providers: map[string]ProviderConfig{
+			"local": {Type: "ollama", Model: "gemma2", Origin: "http://localhost:11434"},
+		},
+		Personas: map[string]Persona{
+			"test": {DisplayName: "テスト", SystemPrompt: "テスト用", MemoryCapacity: 100, MaxSteps: 50},
+		},
+	}
+
+	if err := SaveConfig(path, cfg); err != nil {
+		t.Fatalf("SaveConfig failed: %v", err)
+	}
+
+	loaded, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	if loaded.DefaultProvider != cfg.DefaultProvider {
+		t.Errorf("DefaultProvider: got %q, want %q", loaded.DefaultProvider, cfg.DefaultProvider)
+	}
+	if loaded.DefaultPersona != cfg.DefaultPersona {
+		t.Errorf("DefaultPersona: got %q, want %q", loaded.DefaultPersona, cfg.DefaultPersona)
+	}
+	if loaded.Log.Level != cfg.Log.Level {
+		t.Errorf("Log.Level: got %q, want %q", loaded.Log.Level, cfg.Log.Level)
+	}
+	p := loaded.Providers["local"]
+	if p.Model != "gemma2" {
+		t.Errorf("Provider.Model: got %q, want %q", p.Model, "gemma2")
+	}
+	persona := loaded.Personas["test"]
+	if persona.DisplayName != "テスト" {
+		t.Errorf("Persona.DisplayName: got %q, want %q", persona.DisplayName, "テスト")
+	}
+}
+
 // writeTestConfig はテスト用の設定ファイルを書き出すヘルパー。
 func writeTestConfig(t *testing.T, path, defaultProvider, defaultPersona string, providers map[string]ProviderConfig, personas map[string]Persona) {
 	t.Helper()
