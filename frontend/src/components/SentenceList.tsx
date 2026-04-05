@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
-import type { NoteType, Sentence, SimulationStep } from "../types";
+import type { Note, NoteType, Sentence, SimulationStep } from "../types";
+import { NOTE_LABELS } from "../constants/noteStyles";
+import { StickyNoteStack } from "./StickyNote";
 
 interface SentenceListProps {
   sentences: Sentence[];
@@ -24,10 +26,12 @@ const DIRECTION_STYLES: Record<Direction, { label: string; color: string }> = {
   },
 };
 
-const NOTE_TYPE_STYLES: Record<NoteType, { label: string; color: string }> = {
-  QUESTION: { label: "疑問", color: "text-purple-600 dark:text-purple-400" },
-  RESOLVED: { label: "解決", color: "text-green-600 dark:text-green-400" },
-  CONFUSION: { label: "混乱", color: "text-red-600 dark:text-red-400" },
+// NOTE: StepRowのバッジ色はStickyNoteの背景色系統と意図的に異ならせている。
+// StickyNoteは付箋カードとして背景色+左ボーダーで表現し、StepRowバッジはテキスト色のみで簡潔に表示する。
+const NOTE_TYPE_COLORS: Record<NoteType, string> = {
+  QUESTION: "text-purple-600 dark:text-purple-400",
+  RESOLVED: "text-green-600 dark:text-green-400",
+  CONFUSION: "text-red-600 dark:text-red-400",
 };
 
 function getDirection(step: SimulationStep): Direction {
@@ -84,15 +88,10 @@ function StepRow({ step }: { step: SimulationStep }) {
         </span>
       )}
       {step.note && (
-        <span className="text-xs">
-          <span
-            className={`font-semibold ${NOTE_TYPE_STYLES[step.note.type].color}`}
-          >
-            [{NOTE_TYPE_STYLES[step.note.type].label}]
-          </span>{" "}
-          <span className="text-gray-600 dark:text-gray-400">
-            {step.note.content}
-          </span>
+        <span
+          className={`text-xs font-semibold ${NOTE_TYPE_COLORS[step.note.type]}`}
+        >
+          [{NOTE_LABELS[step.note.type]}]
         </span>
       )}
     </div>
@@ -100,13 +99,23 @@ function StepRow({ step }: { step: SimulationStep }) {
 }
 
 export function SentenceList({ sentences, steps = [], isRunning = false }: SentenceListProps) {
-  const { stepsBySentence, noteStateBySentence } = useMemo(() => {
+  const { stepsBySentence, noteStateBySentence, notesBySentence } = useMemo(() => {
     const stepsBySentence = groupStepsBySentence(steps);
     const noteStateBySentence = new Map<number, SentenceNoteState>();
+    const notesBySentence = new Map<number, { note: Note; stepNumber: number }[]>();
     for (const [idx, relatedSteps] of stepsBySentence) {
       noteStateBySentence.set(idx, getSentenceNoteState(relatedSteps));
+      const notes: { note: Note; stepNumber: number }[] = [];
+      for (const step of relatedSteps) {
+        if (step.note) {
+          notes.push({ note: step.note, stepNumber: step.step });
+        }
+      }
+      if (notes.length > 0) {
+        notesBySentence.set(idx, notes);
+      }
     }
-    return { stepsBySentence, noteStateBySentence };
+    return { stepsBySentence, noteStateBySentence, notesBySentence };
   }, [steps]);
 
   // NOTE: isRunning=true のときのみ、最終ステップの next_index を「現在読書中の文」とみなす。
@@ -148,7 +157,8 @@ export function SentenceList({ sentences, steps = [], isRunning = false }: Sente
                   </span>
                 )}
               </div>
-              {relatedSteps && relatedSteps.length > 0 && (
+              <StickyNoteStack notes={notesBySentence.get(sentence.index) ?? []} />
+              {relatedSteps && (
                 <div className="mt-2 flex flex-col gap-1">
                   {relatedSteps.map((step) => (
                     <StepRow key={step.step} step={step} />
