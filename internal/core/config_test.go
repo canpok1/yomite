@@ -386,8 +386,8 @@ func TestToSlogLevel(t *testing.T) {
 
 // TODO: TestSaveConfig_RoundTrip — 保存して読み戻せる
 // TODO(done): TestSaveConfig_ValidationError — 不正な設定で保存失敗
-// TODO: TestSaveConfig_CreatesParentDir — 親ディレクトリ自動作成
-// TODO: TestSaveConfig_AppliesDefaults — Origin未設定時にデフォルト適用
+// TODO(done): TestSaveConfig_CreatesParentDir — 親ディレクトリ自動作成
+// TODO(done): TestSaveConfig_AppliesDefaults — Origin未設定時にデフォルト適用
 
 func TestSaveConfig_ValidationError(t *testing.T) {
 	dir := t.TempDir()
@@ -417,6 +417,62 @@ func TestSaveConfig_ValidationError(t *testing.T) {
 	// ファイルが作成されていないことを確認
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Error("config file should not have been created on validation error")
+	}
+}
+
+func TestSaveConfig_CreatesParentDir(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sub", "dir", "config.json")
+
+	cfg := Config{
+		Log:             LogConfig{Level: "warn", Path: "/tmp/test.log"},
+		DefaultProvider: "local",
+		DefaultPersona:  "test",
+		Providers: map[string]ProviderConfig{
+			"local": {Type: "ollama", Model: "gemma2", Origin: "http://localhost:11434"},
+		},
+		Personas: map[string]Persona{
+			"test": {DisplayName: "T", SystemPrompt: "t", MemoryCapacity: 100, MaxSteps: 10},
+		},
+	}
+
+	if err := SaveConfig(path, cfg); err != nil {
+		t.Fatalf("SaveConfig failed: %v", err)
+	}
+
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("config file should exist: %v", err)
+	}
+}
+
+func TestSaveConfig_AppliesDefaults(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+
+	cfg := Config{
+		Log:             LogConfig{Level: "info", Path: "/tmp/test.log"},
+		DefaultProvider: "local",
+		DefaultPersona:  "test",
+		Providers: map[string]ProviderConfig{
+			"local": {Type: "ollama", Model: "gemma2"}, // Origin未設定
+		},
+		Personas: map[string]Persona{
+			"test": {DisplayName: "T", SystemPrompt: "t", MemoryCapacity: 100, MaxSteps: 10},
+		},
+	}
+
+	if err := SaveConfig(path, cfg); err != nil {
+		t.Fatalf("SaveConfig failed: %v", err)
+	}
+
+	loaded, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	p := loaded.Providers["local"]
+	if p.Origin != "http://localhost:11434" {
+		t.Errorf("Origin default: got %q, want %q", p.Origin, "http://localhost:11434")
 	}
 }
 
