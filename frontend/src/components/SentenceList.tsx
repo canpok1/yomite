@@ -135,13 +135,16 @@ export function SentenceList({ sentences, steps = [], isRunning = false }: Sente
     return { stepsBySentence, noteStateBySentence, notesBySentence };
   }, [steps]);
 
-  // NOTE: next_index だと常に1つ先の文にラベルが付いてしまうため、current_index を使用する。
+  // NOTE: next_index（次に読む文）を「読書中」表示に使用する。
+  // current_index は「今読んだ文」のため、感想と同じ文にラベルが付いてしまい不適切。
+  // 読了時（next_index === null）は最後に読んだ文（current_index）を指す。
   // ステップ未受信時は最初の文（index=0）を読書中とみなす。
   const currentSentenceIndex = useMemo(() => {
     if (!isRunning) return null;
     if (steps.length === 0) return 0;
     const lastStep = steps[steps.length - 1];
-    return lastStep.current_index;
+    const isDone = lastStep.next_index === null;
+    return isDone ? lastStep.current_index : lastStep.next_index;
   }, [steps, isRunning]);
 
   const currentSentenceRef = useRef<HTMLLIElement>(null);
