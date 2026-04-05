@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -60,6 +61,7 @@ var memoryPromptTmpl = template.Must(
 // promptData はプロンプトテンプレートに渡す共通データ。
 type promptData struct {
 	CurrentIndex    int
+	LastIndex       int // TotalSentences - 1（テンプレートで最後の文の位置を表示するため）
 	TotalSentences  int
 	CurrentSentence string
 	MemorySection   string
@@ -105,6 +107,7 @@ func executeTemplate(tmpl *template.Template, data any) string {
 func BuildNotePrompt(req SimulationRequest) (system string, user string) {
 	return req.SystemPrompt, executeTemplate(notePromptTmpl, promptData{
 		CurrentIndex:    req.CurrentIndex,
+		LastIndex:       req.TotalSentences - 1,
 		TotalSentences:  req.TotalSentences,
 		CurrentSentence: req.CurrentSentence,
 		MemorySection:   placeholderIfEmpty(req.Memory),
@@ -116,6 +119,7 @@ func BuildNotePrompt(req SimulationRequest) (system string, user string) {
 func BuildMemoryPrompt(req SimulationRequest) (system string, user string) {
 	return req.SystemPrompt, executeTemplate(memoryPromptTmpl, promptData{
 		CurrentIndex:    req.CurrentIndex,
+		LastIndex:       req.TotalSentences - 1,
 		TotalSentences:  req.TotalSentences,
 		CurrentSentence: req.CurrentSentence,
 		MemorySection:   placeholderIfEmpty(req.Memory),
@@ -167,10 +171,10 @@ func stripMarkdownCodeBlock(text string) string {
 }
 
 // ParseResponse はPhaseに応じて適切なパース処理を呼び出す。
-func ParseResponse(text string, totalSentences int, phase Phase) (SimulationResponse, error) {
+func ParseResponse(text string, currentIdx, totalSentences int, phase Phase) (SimulationResponse, error) {
 	switch phase {
 	case PhaseNote:
-		return ParseNoteResponse(text, totalSentences)
+		return ParseNoteResponse(text, currentIdx, totalSentences)
 	case PhaseMemory:
 		return ParseMemoryResponse(text)
 	default:
@@ -179,16 +183,68 @@ func ParseResponse(text string, totalSentences int, phase Phase) (SimulationResp
 }
 
 // noteResponse は感想生成段階のLLM応答をパースするための構造体。
+// NOTE: LLMにはJSON全体ではなくフィールド値のみを返させ、
+// current_index や next_index の計算はプログラム側で行う。
 type noteResponse struct {
-	CurrentIndex int   `json:"current_index"`
-	NextIndex    *int  `json:"next_index"`
-	Note         *Note `json:"note"`
+	NextAction  string  `json:"next_action"`
+	Feeling     *string `json:"feeling"`
+	FeelingType *string `json:"feeling_type"`
 }
 
-// ParseNoteResponse は感想生成段階のAI出力をパースし、インデックスの範囲を検証する。
-func ParseNoteResponse(text string, totalSentences int) (SimulationResponse, error) {
+// ErrInvalidNextAction はnext_actionの値が不正な場合のエラーを表す。
+// NOTE: 内部エラーをラップしないため Unwrap は実装しない。
+type ErrInvalidNextAction struct {
+	Value string
+}
+
+func (e *ErrInvalidNextAction) Error() string {
+	return fmt.Sprintf("invalid next_action value: %q (expected \"next\", \"back:N\", or \"finish\")", e.Value)
+}
+
+// feelingTypeToNoteType はLLMのfeeling_type文字列をNoteTypeに変換する。
+func feelingTypeToNoteType(ft string) (NoteType, error) {
+	switch strings.ToUpper(ft) {
+	case "QUESTION":
+		return NoteTypeQuestion, nil
+	case "RESOLVED":
+		return NoteTypeResolved, nil
+	case "CONFUSION":
+		return NoteTypeConfusion, nil
+	default:
+		return "", fmt.Errorf("unknown feeling_type: %q", ft)
+	}
+}
+
+// parseNextAction はnext_action文字列をcurrentIdxとtotalSentencesから次のインデックスに変換する。
+// 読了の場合はnilを返す。
+func parseNextAction(action string, currentIdx, totalSentences int) (*int, error) {
+	switch {
+	case action == "next":
+		next := currentIdx + 1
+		if next >= totalSentences {
+			return nil, nil // 読了
+		}
+		return &next, nil
+	case action == "finish":
+		return nil, nil // 読了
+	case strings.HasPrefix(action, "back:"):
+		nStr := strings.TrimPrefix(action, "back:")
+		n, err := strconv.Atoi(nStr)
+		if err != nil || n <= 0 {
+			return nil, &ErrInvalidNextAction{Value: action}
+		}
+		next := max(currentIdx-n, 0)
+		return &next, nil
+	default:
+		return nil, &ErrInvalidNextAction{Value: action}
+	}
+}
+
+// ParseNoteResponse は感想生成段階のAI出力をパースし、プログラム側でSimulationResponseに組み立てる。
+func ParseNoteResponse(text string, currentIdx, totalSentences int) (SimulationResponse, error) {
 	var resp SimulationResponse
 	resp.RawResponseText = text
+	resp.CurrentIndex = currentIdx
 
 	cleaned := stripMarkdownCodeBlock(text)
 	var nr noteResponse
@@ -196,53 +252,37 @@ func ParseNoteResponse(text string, totalSentences int) (SimulationResponse, err
 		return resp, &ErrInvalidJSON{Raw: text, Err: err}
 	}
 
-	resp.CurrentIndex = nr.CurrentIndex
-	resp.NextIndex = nr.NextIndex
-	resp.Note = nr.Note
+	nextIdx, err := parseNextAction(nr.NextAction, currentIdx, totalSentences)
+	if err != nil {
+		return resp, err
+	}
+	resp.NextIndex = nextIdx
 
-	if resp.CurrentIndex < 0 || resp.CurrentIndex >= totalSentences {
-		return resp, &ErrIndexOutOfRange{
-			Field: "current_index",
-			Index: resp.CurrentIndex,
-			Max:   totalSentences,
-		}
+	if nr.Feeling == nil || *nr.Feeling == "" {
+		return resp, nil
 	}
 
-	if resp.NextIndex != nil {
-		idx := *resp.NextIndex
-		// NOTE: LLMが最後の文を読んだ後に next_index=totalSentences を返すことがある。
-		// これは「次の文へ進む」意図だが範囲外なので、読了（null）として扱う。
-		if idx == totalSentences {
-			resp.NextIndex = nil
-		} else if idx < 0 || idx >= totalSentences {
-			return resp, &ErrIndexOutOfRange{
-				Field: "next_index",
-				Index: idx,
-				Max:   totalSentences,
-			}
-		}
+	ft := "question" // デフォルト（feelingTypeToNoteType内でToUpperされる）
+	if nr.FeelingType != nil && *nr.FeelingType != "" {
+		ft = *nr.FeelingType
 	}
-
+	noteType, err := feelingTypeToNoteType(ft)
+	if err != nil {
+		return resp, &ErrInvalidJSON{Raw: text, Err: err}
+	}
+	resp.Note = &Note{
+		Type:    noteType,
+		Content: *nr.Feeling,
+	}
 	return resp, nil
 }
 
-// memoryResponse はメモリ生成段階のLLM応答をパースするための構造体。
-type memoryResponse struct {
-	Memory string `json:"memory"`
-}
-
 // ParseMemoryResponse はメモリ生成段階のAI出力をパースする。
+// NOTE: LLMにはプレーンテキストで応答させるため、JSON解析は行わない。
+// markdownコードブロックが混入した場合のみ除去する。
 func ParseMemoryResponse(text string) (SimulationResponse, error) {
 	var resp SimulationResponse
 	resp.RawResponseText = text
-
-	cleaned := stripMarkdownCodeBlock(text)
-	var mr memoryResponse
-	if err := json.Unmarshal([]byte(cleaned), &mr); err != nil {
-		return resp, &ErrInvalidJSON{Raw: text, Err: err}
-	}
-
-	resp.Memory = mr.Memory
-
+	resp.Memory = stripMarkdownCodeBlock(text)
 	return resp, nil
 }

@@ -76,5 +76,5 @@ func (p *OllamaProvider) Execute(req SimulationRequest) (SimulationResponse, err
 		return SimulationResponse{}, fmt.Errorf("failed to decode Ollama response: %w", err)
 	}
 
-	return ParseResponse(chatResp.Message.Content, req.TotalSentences, req.Phase)
+	return ParseResponse(chatResp.Message.Content, req.CurrentIndex, req.TotalSentences, req.Phase)
 }

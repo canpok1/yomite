@@ -144,14 +144,15 @@ type Note struct {
 ```text
 1. 視線位置 = 0（先頭文）
 2. AIに現在の文 + コンテキストを送信（毎回独立したリクエスト）
-3. AIが返す: 感想(Note)、次の視線位置、記憶内容
-4. 結果を SimulationStep として記録
-5. 視線位置をAI指定の位置に更新し、2 に戻る
-6. 終了条件を満たしたら終了
+3. Phase 1（Note）: AIが感想と次の行動を返す
+4. Phase 2（Memory）: AIが記憶内容をプレーンテキストで返す
+5. プログラム側で次の視線位置を計算し、SimulationStep として記録
+6. 視線位置を更新し、2 に戻る
+7. 終了条件を満たしたら終了
 ```
 
 #### 終了条件
-* AIが `next_index: null` を返した場合（読了の意思表示）。
+* AIが `next_action: "finish"` を返した場合、または最後の文で `next_action: "next"` を返した場合（読了）。
 * ステップ数がペルソナの `max_steps` に達した場合（デフォルト: 文数 × 3）。
 
 #### AIへの入力（毎ステップ）
@@ -166,28 +167,29 @@ type Note struct {
 * 全文リストは渡さない。人間が頭から順に読み、記憶を頼りに読み進める体験を模倣する。
 * 会話履歴は保持しない。毎回独立したリクエストとし、記憶バッファのみがコンテキストとなる。
 
-#### AIからの出力（毎ステップ）
+#### AIからの出力
+
+##### Phase 1: Note（感想生成）
 
 ```json
 {
-  "current_index": 5,
-  "next_index": 6,
-  "note": {
-    "type": "QUESTION",
-    "content": "この用語の定義がまだ出てきていない"
-  },
-  "memory": "第3文で認知科学が定義された。第5文の主張Aは根拠不明。"
+  "next_action": "next",
+  "feeling": "この用語の定義がまだ出てきていない",
+  "feeling_type": "question"
 }
 ```
 
 | フィールド | 型 | 説明 |
 |---|---|---|
-| `current_index` | int | 今読んだ文のインデックス |
-| `next_index` | int \| null | 次に読む文のインデックス。`null` で読了 |
-| `note` | object \| null | 感想。すんなり読めた場合は `null` |
-| `note.type` | string | `"QUESTION"`: 疑問 / `"RESOLVED"`: 解消 / `"CONFUSION"`: 混乱 |
-| `note.content` | string | 感想の内容 |
-| `memory` | string | 記憶バッファ（毎回全体を上書き） |
+| `next_action` | string | `"next"`: 次の文へ / `"back:N"`: N文戻る / `"finish"`: 読了 |
+| `feeling` | string \| null | 感想の内容。すんなり読めた場合は `null` |
+| `feeling_type` | string \| null | `"question"`: 疑問 / `"resolved"`: 解消 / `"confusion"`: 混乱。`feeling` が `null` の場合は `null` |
+
+プログラム側で `next_action` から次の視線位置（`next_index`）を計算し、`feeling` / `feeling_type` から `Note` 構造体を組み立てる。`current_index` はプログラムが管理する値をそのまま使用する。
+
+##### Phase 2: Memory（記憶生成）
+
+プレーンテキストで記憶内容を返す（JSON形式は不要）。
 
 #### 記憶バッファ
 * 形式: 自由テキスト（1つの文字列）。AIが記憶の構造を自由に決める。
@@ -196,12 +198,11 @@ type Note struct {
 * AIが覚えておく内容・忘れる内容を自ら判断する。
 
 #### 視線移動
-* AIは `next_index` で任意の文を指定できる（前方・後方どちらも可）。
-* 未読の文への先読みも許容する（あとがきから読むような読者を再現可能）。
+* AIは `next_action` で次の行動を指定する。`"next"` で次の文、`"back:N"` でN文戻る。
 * 既読か読み返しかはプログラム側で既読管理から判定する（AI側では判定しない）。
 
 #### 異常系
-* AIが不正なJSON・範囲外のインデックスを返した場合のエラーハンドリングを行う。
+* AIが不正なJSONや不正な `next_action` 値を返した場合のエラーハンドリングを行う。
 
 ### 5.2 ユーザーインターフェース
 
