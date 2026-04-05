@@ -54,7 +54,7 @@ func LoadConfig(explicitPath string) (*Config, error) {
 	}
 
 	localPath := "yomite.json"
-	globalPath, err := globalConfigPath()
+	globalPath, err := GlobalConfigPath()
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine global config path: %w", err)
 	}
@@ -110,7 +110,8 @@ func loadConfigFile(path string) (*Config, error) {
 	return &cfg, nil
 }
 
-func globalConfigPath() (string, error) {
+// GlobalConfigPath はグローバル設定ファイルのデフォルトパスを返す。
+func GlobalConfigPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -163,6 +164,31 @@ func ToSlogLevel(level string) slog.Level {
 	default:
 		return slog.LevelWarn
 	}
+}
+
+// SaveConfig は設定をバリデーションした上でJSONファイルに保存する。
+// 親ディレクトリが存在しない場合は自動作成する。
+func SaveConfig(path string, cfg Config) error {
+	applyDefaults(&cfg)
+	if err := validate(&cfg); err != nil {
+		return err
+	}
+
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("failed to write config to %s: %w", path, err)
+	}
+
+	return nil
 }
 
 func mergeConfig(base, override *Config) *Config {

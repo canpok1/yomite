@@ -384,6 +384,137 @@ func TestToSlogLevel(t *testing.T) {
 	}
 }
 
+func TestSaveConfig_ValidationError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+
+	// log.path が未設定 → バリデーションエラー
+	cfg := Config{
+		Log:             LogConfig{Level: "info"},
+		DefaultProvider: "local",
+		DefaultPersona:  "test",
+		Providers: map[string]ProviderConfig{
+			"local": {Type: "ollama", Model: "gemma2"},
+		},
+		Personas: map[string]Persona{
+			"test": {DisplayName: "T", SystemPrompt: "t", MemoryCapacity: 100, MaxSteps: 10},
+		},
+	}
+
+	err := SaveConfig(path, cfg)
+	if err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+	if !strings.Contains(err.Error(), "log.path is required") {
+		t.Errorf("expected log.path error, got: %s", err.Error())
+	}
+
+	// ファイルが作成されていないことを確認
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("config file should not have been created on validation error")
+	}
+}
+
+func TestSaveConfig_CreatesParentDir(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sub", "dir", "config.json")
+
+	cfg := Config{
+		Log:             LogConfig{Level: "warn", Path: "/tmp/test.log"},
+		DefaultProvider: "local",
+		DefaultPersona:  "test",
+		Providers: map[string]ProviderConfig{
+			"local": {Type: "ollama", Model: "gemma2", Origin: "http://localhost:11434"},
+		},
+		Personas: map[string]Persona{
+			"test": {DisplayName: "T", SystemPrompt: "t", MemoryCapacity: 100, MaxSteps: 10},
+		},
+	}
+
+	if err := SaveConfig(path, cfg); err != nil {
+		t.Fatalf("SaveConfig failed: %v", err)
+	}
+
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("config file should exist: %v", err)
+	}
+}
+
+func TestSaveConfig_AppliesDefaults(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+
+	cfg := Config{
+		Log:             LogConfig{Level: "info", Path: "/tmp/test.log"},
+		DefaultProvider: "local",
+		DefaultPersona:  "test",
+		Providers: map[string]ProviderConfig{
+			"local": {Type: "ollama", Model: "gemma2"}, // Origin未設定
+		},
+		Personas: map[string]Persona{
+			"test": {DisplayName: "T", SystemPrompt: "t", MemoryCapacity: 100, MaxSteps: 10},
+		},
+	}
+
+	if err := SaveConfig(path, cfg); err != nil {
+		t.Fatalf("SaveConfig failed: %v", err)
+	}
+
+	loaded, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	p := loaded.Providers["local"]
+	if p.Origin != "http://localhost:11434" {
+		t.Errorf("Origin default: got %q, want %q", p.Origin, "http://localhost:11434")
+	}
+}
+
+func TestSaveConfig_RoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+
+	cfg := Config{
+		Log:             LogConfig{Level: "info", Path: "/tmp/test.log"},
+		DefaultProvider: "local",
+		DefaultPersona:  "test",
+		Providers: map[string]ProviderConfig{
+			"local": {Type: "ollama", Model: "gemma2", Origin: "http://localhost:11434"},
+		},
+		Personas: map[string]Persona{
+			"test": {DisplayName: "テスト", SystemPrompt: "テスト用", MemoryCapacity: 100, MaxSteps: 50},
+		},
+	}
+
+	if err := SaveConfig(path, cfg); err != nil {
+		t.Fatalf("SaveConfig failed: %v", err)
+	}
+
+	loaded, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	if loaded.DefaultProvider != cfg.DefaultProvider {
+		t.Errorf("DefaultProvider: got %q, want %q", loaded.DefaultProvider, cfg.DefaultProvider)
+	}
+	if loaded.DefaultPersona != cfg.DefaultPersona {
+		t.Errorf("DefaultPersona: got %q, want %q", loaded.DefaultPersona, cfg.DefaultPersona)
+	}
+	if loaded.Log.Level != cfg.Log.Level {
+		t.Errorf("Log.Level: got %q, want %q", loaded.Log.Level, cfg.Log.Level)
+	}
+	p := loaded.Providers["local"]
+	if p.Model != "gemma2" {
+		t.Errorf("Provider.Model: got %q, want %q", p.Model, "gemma2")
+	}
+	persona := loaded.Personas["test"]
+	if persona.DisplayName != "テスト" {
+		t.Errorf("Persona.DisplayName: got %q, want %q", persona.DisplayName, "テスト")
+	}
+}
+
 // writeTestConfig はテスト用の設定ファイルを書き出すヘルパー。
 func writeTestConfig(t *testing.T, path, defaultProvider, defaultPersona string, providers map[string]ProviderConfig, personas map[string]Persona) {
 	t.Helper()
