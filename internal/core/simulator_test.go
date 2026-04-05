@@ -106,6 +106,9 @@ func TestRunSimulation_NormalCompletion(t *testing.T) {
 	if steps[0].Note != nil {
 		t.Errorf("step 1: expected no note")
 	}
+	if steps[0].Memory != "文1を読んだ" {
+		t.Errorf("step 1: expected Memory=%q, got %q", "文1を読んだ", steps[0].Memory)
+	}
 
 	// Step 2
 	if steps[1].Step != 2 || steps[1].SentenceIdx != 1 {
@@ -114,6 +117,9 @@ func TestRunSimulation_NormalCompletion(t *testing.T) {
 	if steps[1].Note == nil || steps[1].Note.Type != NoteTypeQuestion {
 		t.Errorf("step 2: expected QUESTION note")
 	}
+	if steps[1].Memory != "文1と文2を読んだ" {
+		t.Errorf("step 2: expected Memory=%q, got %q", "文1と文2を読んだ", steps[1].Memory)
+	}
 
 	// Step 3
 	if steps[2].Step != 3 || steps[2].SentenceIdx != 2 {
@@ -121,6 +127,9 @@ func TestRunSimulation_NormalCompletion(t *testing.T) {
 	}
 	if steps[2].TargetIdx != nil {
 		t.Errorf("step 3: expected nil TargetIdx for completion")
+	}
+	if steps[2].Memory != "全部読んだ" {
+		t.Errorf("step 3: expected Memory=%q, got %q", "全部読んだ", steps[2].Memory)
 	}
 }
 
@@ -349,6 +358,11 @@ func TestRunSimulation_MemoryCapacityLimit(t *testing.T) {
 	// 最初のnoteリクエストのmemoryは空
 	if mock.calls[0].Memory != "" {
 		t.Errorf("first note request should have empty memory, got %q", mock.calls[0].Memory)
+	}
+
+	// ステップのMemoryには切り詰め後の値が含まれる
+	if steps[0].Memory != "これは長い" {
+		t.Errorf("step memory should be truncated to 5 runes, got %q", steps[0].Memory)
 	}
 }
 

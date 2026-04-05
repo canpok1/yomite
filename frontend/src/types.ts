@@ -11,6 +11,7 @@ export interface SimulationStep {
   current_index: number;
   next_index: number | null;
   note: Note | null;
+  memory: string;
 }
 
 export interface Note {

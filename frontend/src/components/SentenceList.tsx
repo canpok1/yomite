@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Note, NoteType, Sentence, SimulationStep } from "../types";
 import { NOTE_LABELS } from "../constants/noteStyles";
 import { StickyNoteStack } from "./StickyNote";
@@ -72,29 +72,46 @@ const SENTENCE_BG_STYLES: Record<SentenceNoteState, string> = {
 
 function StepRow({ step }: { step: SimulationStep }) {
   const dirStyle = DIRECTION_STYLES[getDirection(step)];
+  const [memoryOpen, setMemoryOpen] = useState(false);
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <span className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-xs font-bold">
-        {step.step}
-      </span>
-      <span
-        className={`px-2 py-0.5 rounded text-xs font-semibold ${dirStyle.color}`}
-      >
-        {dirStyle.label}
-      </span>
-      {step.next_index !== null && (
-        <span className="text-xs text-gray-500 dark:text-gray-400">
-          → 文 {step.next_index + 1}
+    <>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-xs font-bold">
+          {step.step}
         </span>
-      )}
-      {step.note && (
         <span
-          className={`text-xs font-semibold ${NOTE_TYPE_COLORS[step.note.type]}`}
+          className={`px-2 py-0.5 rounded text-xs font-semibold ${dirStyle.color}`}
         >
-          [{NOTE_LABELS[step.note.type]}]
+          {dirStyle.label}
         </span>
+        {step.next_index !== null && (
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            → 文 {step.next_index + 1}
+          </span>
+        )}
+        {step.note && (
+          <span
+            className={`text-xs font-semibold ${NOTE_TYPE_COLORS[step.note.type]}`}
+          >
+            [{NOTE_LABELS[step.note.type]}]
+          </span>
+        )}
+        {step.memory && (
+          <button
+            type="button"
+            onClick={() => setMemoryOpen((prev) => !prev)}
+            className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer"
+          >
+            {memoryOpen ? "▼" : "▶"} 記憶
+          </button>
+        )}
+      </div>
+      {memoryOpen && (
+        <div className="mt-1 ml-8 p-2 text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 whitespace-pre-wrap">
+          {step.memory}
+        </div>
       )}
-    </div>
+    </>
   );
 }
 
