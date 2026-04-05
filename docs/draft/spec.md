@@ -114,7 +114,7 @@ type Sentence struct {
 3. `すぐ行く。」`
 4. `と言った。`
 
-**実装箇所:** `core/document.go` の `SplitSentences()` 関数
+**実装箇所:** `internal/core/document.go` の `SplitSentences()` 関数
 
 ### ② SimulationStep (AI読者の思考ログ)
 ```go
@@ -236,13 +236,16 @@ type Note struct {
 
 ```text
 yomite/
-├── core/                # Go: 共通ロジック
-│   ├── config.go        # Map形式の設定読み込み
-│   ├── document.go      # 文分割ロジック
-│   └── simulator.go     # Ollama連携・プロンプト管理
 ├── cmd/
-│   └── yomite/          # Go: CLIインターフェース
+│   └── yomite/          # Go: CLIエントリポイント
+├── internal/
+│   ├── core/            # Go: CLI・GUI共通ロジック
+│   │   ├── config.go    # Map形式の設定読み込み
+│   │   ├── document.go  # 文分割ロジック
+│   │   └── simulator.go # Ollama連携・プロンプト管理
+│   ├── cli/             # Go: CLI固有ロジック
+│   └── gui/             # Go: GUI固有ロジック (Wailsバインディング)
 ├── frontend/            # TS: GUIインターフェース (React/Tailwind)
-├── main.go              # Go: Wailsエントリポイント
+├── main_gui.go          # Go: Wailsエントリポイント (ルート維持)
 └── wails.json           # Wailsビルド設定
 ```

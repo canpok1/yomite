@@ -1,6 +1,4 @@
-//go:build gui
-
-package main
+package gui
 
 import (
 	"context"
@@ -9,7 +7,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/canpok1/yomite/core"
+	"github.com/canpok1/yomite/internal/core"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -40,7 +38,7 @@ func NewApp() *App {
 	return a
 }
 
-func (a *App) startup(ctx context.Context) {
+func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
 }
 

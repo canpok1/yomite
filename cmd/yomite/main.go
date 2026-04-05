@@ -1,12 +1,10 @@
-//go:build !gui
-
 package main
 
 import (
 	"fmt"
 	"os"
 
-	yomite "github.com/canpok1/yomite/cmd/yomite"
+	"github.com/canpok1/yomite/internal/cli"
 )
 
 func printUsage() {
@@ -24,7 +22,7 @@ func main() {
 
 	switch os.Args[1] {
 	case "run":
-		os.Exit(yomite.Run(os.Args[2:], os.Stdout, os.Stderr))
+		os.Exit(cli.Run(os.Args[2:], os.Stdout, os.Stderr))
 	default:
 		_, _ = fmt.Fprintf(os.Stderr, "エラー: 不明なコマンド %q\n", os.Args[1])
 		printUsage()

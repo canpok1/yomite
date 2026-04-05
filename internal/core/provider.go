@@ -7,7 +7,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/canpok1/yomite/core/templates"
+	"github.com/canpok1/yomite/internal/core/templates"
 )
 
 // Phase はLLM呼び出しの段階を表す。
