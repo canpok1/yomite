@@ -127,12 +127,13 @@ export function SentenceList({ sentences, steps = [], isRunning = false }: Sente
     return lastStep.next_index;
   }, [steps, isRunning]);
 
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const currentSentenceRef = useRef<HTMLLIElement>(null);
+  // NOTE: 依存配列はcurrentSentenceIndexのみ。同一文に留まるステップ追加時の再スクロールは不要なため、steps.lengthは含めない。
   useEffect(() => {
-    if (steps.length > 0) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (currentSentenceIndex !== null) {
+      currentSentenceRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  }, [steps.length]);
+  }, [currentSentenceIndex]);
 
   return (
     <ol className="flex flex-col gap-2">
@@ -143,6 +144,7 @@ export function SentenceList({ sentences, steps = [], isRunning = false }: Sente
         return (
           <li
             key={sentence.index}
+            ref={isCurrent ? currentSentenceRef : null}
             data-sentence-index={sentence.index}
             className={`flex gap-3 p-3 rounded border ${SENTENCE_BG_STYLES[noteState]}${isCurrent ? " ring-2 ring-blue-400 dark:ring-blue-500" : ""}`}
           >
@@ -170,7 +172,6 @@ export function SentenceList({ sentences, steps = [], isRunning = false }: Sente
           </li>
         );
       })}
-      <div ref={bottomRef} />
     </ol>
   );
 }
