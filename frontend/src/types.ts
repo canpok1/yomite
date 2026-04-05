@@ -28,7 +28,7 @@ export interface Config {
 }
 
 export interface LogConfig {
-  level: "debug" | "info" | "warn";
+  level: string;
   path: string;
 }
 
