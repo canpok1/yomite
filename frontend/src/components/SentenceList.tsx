@@ -118,13 +118,13 @@ export function SentenceList({ sentences, steps = [], isRunning = false }: Sente
     return { stepsBySentence, noteStateBySentence, notesBySentence };
   }, [steps]);
 
-  // NOTE: isRunning=true のときのみ、最終ステップの next_index を「現在読書中の文」とみなす。
-  // 完了ステップ（next_index=null）は読書中扱いしない。
+  // NOTE: next_index だと常に1つ先の文にラベルが付いてしまうため、current_index を使用する。
+  // ステップ未受信時は最初の文（index=0）を読書中とみなす。
   const currentSentenceIndex = useMemo(() => {
-    if (!isRunning || steps.length === 0) return null;
+    if (!isRunning) return null;
+    if (steps.length === 0) return 0;
     const lastStep = steps[steps.length - 1];
-    if (lastStep.next_index === null) return null;
-    return lastStep.next_index;
+    return lastStep.current_index;
   }, [steps, isRunning]);
 
   const currentSentenceRef = useRef<HTMLLIElement>(null);
