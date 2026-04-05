@@ -1,4 +1,4 @@
-package yomite
+package cli
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/canpok1/yomite/core"
+	"github.com/canpok1/yomite/internal/core"
 )
 
 var providerFactory func(cfg core.ProviderConfig) core.Provider

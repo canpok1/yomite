@@ -4,7 +4,7 @@ setup:
 	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.5.0
 
 build:
-	go build -o $(BINARY_NAME) .
+	go build -o $(BINARY_NAME) ./cmd/yomite
 
 setup-gui:
 	cd frontend && npm install
@@ -28,7 +28,7 @@ lint:
 	golangci-lint run ./...
 
 run:
-	go run . ${options}
+	go run ./cmd/yomite ${options}
 
 run-gui:
 	wails dev -tags gui

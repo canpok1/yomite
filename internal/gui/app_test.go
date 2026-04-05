@@ -1,6 +1,4 @@
-//go:build gui
-
-package main
+package gui
 
 import (
 	"context"
@@ -10,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/canpok1/yomite/core"
+	"github.com/canpok1/yomite/internal/core"
 )
 
 // mockProvider はテスト用のProviderモック。

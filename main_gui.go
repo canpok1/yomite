@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/canpok1/yomite/internal/gui"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -16,7 +17,7 @@ import (
 var assets embed.FS
 
 func main() {
-	app := NewApp()
+	app := gui.NewApp()
 
 	err := wails.Run(&options.App{
 		Title:  "yomite",
@@ -25,7 +26,7 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		OnStartup: app.startup,
+		OnStartup: app.Startup,
 		Bind: []any{
 			app,
 		},
