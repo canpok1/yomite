@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"log/slog"
+	"time"
 )
 
 // RunSimulation はドキュメントに対してAI読者シミュレーションを実行する。
@@ -30,6 +31,8 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 	completedSteps := 0
 
 	for step := 1; step <= maxSteps; step++ {
+		stepStart := time.Now()
+
 		// Phase 1: 感想生成（note + next_index）
 		noteReq := SimulationRequest{
 			Phase:           PhaseNote,
@@ -95,6 +98,7 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 			TargetIdx:   noteResp.NextIndex,
 			Note:        noteResp.Note,
 			Memory:      memory,
+			DurationMs:  time.Since(stepStart).Milliseconds(),
 		}
 		if err := onStep(s); err != nil {
 			return fmt.Errorf("step %d: callback error: %w", step, err)
@@ -105,6 +109,7 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 			"step", step,
 			"current_index", currentIdx,
 			"next_index", noteResp.NextIndex,
+			"duration_ms", s.DurationMs,
 		)
 
 		if !hasNext {

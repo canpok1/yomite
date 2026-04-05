@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Editor } from "./components/Editor";
 import { SentenceList } from "./components/SentenceList";
 import { GazeArrows } from "./components/GazeArrows";
@@ -33,6 +33,11 @@ function App() {
   const sentenceListRef = useRef<HTMLDivElement>(null);
 
   const isResultView = sentences.length > 0 && simulation.status !== "idle";
+
+  const totalDurationMs = useMemo(
+    () => simulation.steps.reduce((sum, step) => sum + step.duration_ms, 0),
+    [simulation.steps],
+  );
 
   async function handleStart(text: string, providerID: string, personaID: string) {
     const result = await LoadDocument(text);
@@ -85,6 +90,11 @@ function App() {
                 className={`text-xs px-2 py-0.5 rounded ${STATUS_BADGE[simulation.status]!.className}`}
               >
                 {STATUS_BADGE[simulation.status]!.label}
+              </span>
+            )}
+            {simulation.status === "completed" && totalDurationMs > 0 && (
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                合計 {(totalDurationMs / 1000).toFixed(1)}s
               </span>
             )}
             {simulation.status === "running" && (

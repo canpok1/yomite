@@ -29,6 +29,7 @@ type SimulationStep struct {
 	TargetIdx   *int   `json:"next_index"`
 	Note        *Note  `json:"note"`
 	Memory      string `json:"memory"`
+	DurationMs  int64  `json:"duration_ms"`
 }
 
 // Note はシミュレーション中の読者の感想を表す。
