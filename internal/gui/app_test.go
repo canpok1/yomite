@@ -135,8 +135,11 @@ func TestLoadDocument_Empty(t *testing.T) {
 
 	sentences := app.LoadDocument("")
 
-	if sentences != nil {
-		t.Errorf("expected nil for empty input, got %v", sentences)
+	if sentences == nil {
+		t.Error("expected non-nil empty slice, got nil")
+	}
+	if len(sentences) != 0 {
+		t.Errorf("expected empty slice, got %v", sentences)
 	}
 }
 

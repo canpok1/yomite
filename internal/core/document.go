@@ -14,7 +14,7 @@ import (
 //  5. 空白のみ・空文字の文はフィルタリングして除外する。
 func (d *Document) SplitSentences() []Sentence {
 	if d.RawText == "" {
-		return nil
+		return []Sentence{}
 	}
 
 	// まず段落区切り（空行）で分割
@@ -27,7 +27,8 @@ func (d *Document) SplitSentences() []Sentence {
 	}
 
 	// 空文除外してSentenceスライスを構築
-	var sentences []Sentence
+	// NOTE: nilではなく空スライスを返すことで、JSON出力が"null"ではなく"[]"になることを保証する。
+	sentences := make([]Sentence, 0)
 	for _, part := range rawParts {
 		trimmed := strings.TrimSpace(part)
 		if trimmed == "" {
