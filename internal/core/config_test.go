@@ -385,9 +385,40 @@ func TestToSlogLevel(t *testing.T) {
 }
 
 // TODO: TestSaveConfig_RoundTrip — 保存して読み戻せる
-// TODO: TestSaveConfig_ValidationError — 不正な設定で保存失敗
+// TODO(done): TestSaveConfig_ValidationError — 不正な設定で保存失敗
 // TODO: TestSaveConfig_CreatesParentDir — 親ディレクトリ自動作成
 // TODO: TestSaveConfig_AppliesDefaults — Origin未設定時にデフォルト適用
+
+func TestSaveConfig_ValidationError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+
+	// log.path が未設定 → バリデーションエラー
+	cfg := Config{
+		Log:             LogConfig{Level: "info"},
+		DefaultProvider: "local",
+		DefaultPersona:  "test",
+		Providers: map[string]ProviderConfig{
+			"local": {Type: "ollama", Model: "gemma2"},
+		},
+		Personas: map[string]Persona{
+			"test": {DisplayName: "T", SystemPrompt: "t", MemoryCapacity: 100, MaxSteps: 10},
+		},
+	}
+
+	err := SaveConfig(path, cfg)
+	if err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+	if !strings.Contains(err.Error(), "log.path is required") {
+		t.Errorf("expected log.path error, got: %s", err.Error())
+	}
+
+	// ファイルが作成されていないことを確認
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("config file should not have been created on validation error")
+	}
+}
 
 func TestSaveConfig_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
