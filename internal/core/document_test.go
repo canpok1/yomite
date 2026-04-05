@@ -11,6 +11,9 @@ func TestSplitSentences_EmptyString(t *testing.T) {
 	doc := Document{RawText: ""}
 	got := doc.SplitSentences()
 
+	if got == nil {
+		t.Error("expected non-nil empty slice, got nil")
+	}
 	if len(got) != 0 {
 		t.Errorf("expected empty slice, got %v", got)
 	}
