@@ -4,6 +4,7 @@ package main
 
 import (
 	"embed"
+	"flag"
 	"fmt"
 	"os"
 
@@ -17,7 +18,11 @@ import (
 var assets embed.FS
 
 func main() {
-	app := gui.NewApp()
+	var configPath string
+	flag.StringVar(&configPath, "config", "", "設定ファイルのパスを明示指定")
+	flag.Parse()
+
+	app := gui.NewApp(configPath)
 
 	err := wails.Run(&options.App{
 		Title:  "yomite",

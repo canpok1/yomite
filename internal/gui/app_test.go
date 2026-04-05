@@ -115,7 +115,7 @@ func waitForSimulationDone(t *testing.T, app *App) {
 }
 
 func TestLoadDocument(t *testing.T) {
-	app := NewApp()
+	app := NewApp("")
 
 	sentences := app.LoadDocument("文1。文2。文3。")
 
@@ -131,7 +131,7 @@ func TestLoadDocument(t *testing.T) {
 }
 
 func TestLoadDocument_Empty(t *testing.T) {
-	app := NewApp()
+	app := NewApp("")
 
 	sentences := app.LoadDocument("")
 
@@ -266,7 +266,7 @@ func TestStopSimulation_CancelsRunning(t *testing.T) {
 }
 
 func TestStopSimulation_NoOp(t *testing.T) {
-	app := NewApp()
+	app := NewApp("")
 	app.StopSimulation()
 }
 

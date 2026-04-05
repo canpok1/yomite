@@ -31,7 +31,7 @@ run:
 	go run ./cmd/yomite ${options}
 
 run-gui:
-	wails dev -tags gui
+	wails dev -tags gui -appargs "${options}"
 
 all: build
 
