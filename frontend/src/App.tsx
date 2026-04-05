@@ -10,7 +10,7 @@ const STATUS_BADGE: Partial<
   Record<SimulationStatus, { label: string; className: string }>
 > = {
   running: {
-    label: "実��中…",
+    label: "実行中…",
     className:
       "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 animate-pulse",
   },
