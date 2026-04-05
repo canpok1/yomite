@@ -77,23 +77,6 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 			}
 		}
 
-		s := SimulationStep{
-			Step:        step,
-			SentenceIdx: currentIdx,
-			TargetIdx:   noteResp.NextIndex,
-			Note:        noteResp.Note,
-		}
-		if err := onStep(s); err != nil {
-			return fmt.Errorf("step %d: callback error: %w", step, err)
-		}
-		completedSteps++
-
-		logger.Info("step completed",
-			"step", step,
-			"current_index", currentIdx,
-			"next_index", noteResp.NextIndex,
-		)
-
 		memory = memResp.Memory
 		runes := []rune(memory)
 		memoryLen := len(runes)
@@ -105,6 +88,24 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 				"truncated_length", persona.MemoryCapacity,
 			)
 		}
+
+		s := SimulationStep{
+			Step:        step,
+			SentenceIdx: currentIdx,
+			TargetIdx:   noteResp.NextIndex,
+			Note:        noteResp.Note,
+			Memory:      memory,
+		}
+		if err := onStep(s); err != nil {
+			return fmt.Errorf("step %d: callback error: %w", step, err)
+		}
+		completedSteps++
+
+		logger.Info("step completed",
+			"step", step,
+			"current_index", currentIdx,
+			"next_index", noteResp.NextIndex,
+		)
 
 		if !hasNext {
 			break
