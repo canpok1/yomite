@@ -384,11 +384,6 @@ func TestToSlogLevel(t *testing.T) {
 	}
 }
 
-// TODO: TestSaveConfig_RoundTrip — 保存して読み戻せる
-// TODO(done): TestSaveConfig_ValidationError — 不正な設定で保存失敗
-// TODO(done): TestSaveConfig_CreatesParentDir — 親ディレクトリ自動作成
-// TODO(done): TestSaveConfig_AppliesDefaults — Origin未設定時にデフォルト適用
-
 func TestSaveConfig_ValidationError(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.json")
