@@ -49,9 +49,9 @@ func (a *App) LoadDocument(rawText string) []core.Sentence {
 	return doc.SplitSentences()
 }
 
-// GetConfig は設定ファイルを読み込んで返す。
+// GetConfig は起動時パスから設定ファイルを読み込んで返す。
 func (a *App) GetConfig() (*core.Config, error) {
-	return core.LoadConfig(a.configPath)
+	return a.LoadConfigFromPath(a.configPath)
 }
 
 // ListProviders は利用可能なプロバイダID一覧を返す。
@@ -154,4 +154,26 @@ func (a *App) StopSimulation() {
 	if a.cancel != nil {
 		a.cancel()
 	}
+}
+
+// SaveConfig は設定をバリデーションした上で指定パスに保存する。
+func (a *App) SaveConfig(path string, cfg core.Config) error {
+	return core.SaveConfig(path, cfg)
+}
+
+// LoadConfigFromPath は設定ファイルを読み込んで返す。
+// path が空の場合はローカル→グローバルの探索・マージを行う。
+func (a *App) LoadConfigFromPath(path string) (*core.Config, error) {
+	return core.LoadConfig(path)
+}
+
+// GetConfigPath は起動時に指定された設定ファイルパスを返す。
+// 未指定の場合は空文字を返す。
+func (a *App) GetConfigPath() string {
+	return a.configPath
+}
+
+// GetDefaultConfigPath はデフォルトの設定ファイルパスを返す。
+func (a *App) GetDefaultConfigPath() (string, error) {
+	return core.GlobalConfigPath()
 }

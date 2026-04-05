@@ -54,7 +54,7 @@ func LoadConfig(explicitPath string) (*Config, error) {
 	}
 
 	localPath := "yomite.json"
-	globalPath, err := globalConfigPath()
+	globalPath, err := GlobalConfigPath()
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine global config path: %w", err)
 	}
@@ -110,7 +110,8 @@ func loadConfigFile(path string) (*Config, error) {
 	return &cfg, nil
 }
 
-func globalConfigPath() (string, error) {
+// GlobalConfigPath はグローバル設定ファイルのデフォルトパスを返す。
+func GlobalConfigPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
