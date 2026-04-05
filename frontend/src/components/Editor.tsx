@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ListProviders, ListPersonas } from "../../wailsjs/go/main/App";
+import { ListProviders, ListPersonas } from "../../wailsjs/go/gui/App";
 import type { SimulationStatus } from "../hooks/useSimulation";
 
 interface EditorProps {

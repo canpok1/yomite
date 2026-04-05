@@ -23,12 +23,13 @@ type App struct {
 	cancel context.CancelFunc
 	mu     sync.Mutex
 
+	configPath      string
 	providerFactory func(cfg core.ProviderConfig) core.Provider
 	emitEvent       func(eventName string, data ...any)
 }
 
-func NewApp() *App {
-	a := &App{}
+func NewApp(configPath string) *App {
+	a := &App{configPath: configPath}
 	a.providerFactory = func(cfg core.ProviderConfig) core.Provider {
 		return core.NewOllamaProvider(cfg.Origin, cfg.Model)
 	}
@@ -50,12 +51,12 @@ func (a *App) LoadDocument(rawText string) []core.Sentence {
 
 // GetConfig は設定ファイルを読み込んで返す。
 func (a *App) GetConfig() (*core.Config, error) {
-	return core.LoadConfig("")
+	return core.LoadConfig(a.configPath)
 }
 
 // ListProviders は利用可能なプロバイダID一覧を返す。
 func (a *App) ListProviders() ([]string, error) {
-	cfg, err := core.LoadConfig("")
+	cfg, err := core.LoadConfig(a.configPath)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +70,7 @@ func (a *App) ListProviders() ([]string, error) {
 
 // ListPersonas はペルソナID→表示名のマッピングを返す。
 func (a *App) ListPersonas() (map[string]string, error) {
-	cfg, err := core.LoadConfig("")
+	cfg, err := core.LoadConfig(a.configPath)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +83,7 @@ func (a *App) ListPersonas() (map[string]string, error) {
 
 // StartSimulation はgoroutineでシミュレーションを実行し、Wails Eventsで逐次通知する。
 func (a *App) StartSimulation(rawText, providerID, personaID string) error {
-	cfg, err := core.LoadConfig("")
+	cfg, err := core.LoadConfig(a.configPath)
 	if err != nil {
 		return err
 	}

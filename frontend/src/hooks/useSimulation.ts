@@ -3,7 +3,7 @@ import { EventsOn } from "../../wailsjs/runtime/runtime";
 import {
   StartSimulation,
   StopSimulation,
-} from "../../wailsjs/go/main/App";
+} from "../../wailsjs/go/gui/App";
 import type { SimulationStep } from "../types";
 
 export type SimulationStatus = "idle" | "running" | "completed" | "error";

@@ -3,14 +3,14 @@ import { Editor } from "./components/Editor";
 import { SentenceList } from "./components/SentenceList";
 import { StepList } from "./components/StepList";
 import { useSimulation, type SimulationStatus } from "./hooks/useSimulation";
-import { LoadDocument } from "../wailsjs/go/main/App";
+import { LoadDocument } from "../wailsjs/go/gui/App";
 import type { Sentence } from "./types";
 
 const STATUS_BADGE: Partial<
   Record<SimulationStatus, { label: string; className: string }>
 > = {
   running: {
-    label: "実��中…",
+    label: "実行中…",
     className:
       "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 animate-pulse",
   },
