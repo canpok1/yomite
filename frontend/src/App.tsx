@@ -3,7 +3,7 @@ import { Editor } from "./components/Editor";
 import { SentenceList } from "./components/SentenceList";
 import { StepList } from "./components/StepList";
 import { useSimulation, type SimulationStatus } from "./hooks/useSimulation";
-import { LoadDocument } from "../wailsjs/go/main/App";
+import { LoadDocument } from "../wailsjs/go/gui/App";
 import type { Sentence } from "./types";
 
 const STATUS_BADGE: Partial<
