@@ -4,6 +4,7 @@ import type { NoteType, Sentence, SimulationStep } from "../types";
 interface SentenceListProps {
   sentences: Sentence[];
   steps?: SimulationStep[];
+  isRunning?: boolean;
 }
 
 type Direction = "done" | "forward" | "backward";
@@ -45,6 +46,26 @@ function groupStepsBySentence(steps: SimulationStep[]): Map<number, SimulationSt
   return map;
 }
 
+type SentenceNoteState = "confusion" | "resolved" | "none";
+
+function getSentenceNoteState(relatedSteps: SimulationStep[] | undefined): SentenceNoteState {
+  if (!relatedSteps) return "none";
+  let hasResolved = false;
+  for (const step of relatedSteps) {
+    // NOTE: 混乱は解決より読者体験上重大なため、見つかった時点で即確定する
+    if (step.note?.type === "CONFUSION") return "confusion";
+    if (step.note?.type === "RESOLVED") hasResolved = true;
+  }
+  if (hasResolved) return "resolved";
+  return "none";
+}
+
+const SENTENCE_BG_STYLES: Record<SentenceNoteState, string> = {
+  confusion: "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800",
+  resolved: "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800",
+  none: "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700",
+};
+
 function StepRow({ step }: { step: SimulationStep }) {
   const dirStyle = DIRECTION_STYLES[getDirection(step)];
   return (
@@ -78,11 +99,24 @@ function StepRow({ step }: { step: SimulationStep }) {
   );
 }
 
-export function SentenceList({ sentences, steps = [] }: SentenceListProps) {
-  const stepsBySentence = useMemo(
-    () => groupStepsBySentence(steps),
-    [steps],
-  );
+export function SentenceList({ sentences, steps = [], isRunning = false }: SentenceListProps) {
+  const { stepsBySentence, noteStateBySentence } = useMemo(() => {
+    const stepsBySentence = groupStepsBySentence(steps);
+    const noteStateBySentence = new Map<number, SentenceNoteState>();
+    for (const [idx, relatedSteps] of stepsBySentence) {
+      noteStateBySentence.set(idx, getSentenceNoteState(relatedSteps));
+    }
+    return { stepsBySentence, noteStateBySentence };
+  }, [steps]);
+
+  // NOTE: isRunning=true のときのみ、最終ステップの next_index を「現在読書中の文」とみなす。
+  // 完了ステップ（next_index=null）は読書中扱いしない。
+  const currentSentenceIndex = useMemo(() => {
+    if (!isRunning || steps.length === 0) return null;
+    const lastStep = steps[steps.length - 1];
+    if (lastStep.next_index === null) return null;
+    return lastStep.next_index;
+  }, [steps, isRunning]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -95,16 +129,25 @@ export function SentenceList({ sentences, steps = [] }: SentenceListProps) {
     <ol className="flex flex-col gap-2">
       {sentences.map((sentence) => {
         const relatedSteps = stepsBySentence.get(sentence.index);
+        const noteState = noteStateBySentence.get(sentence.index) ?? "none";
+        const isCurrent = sentence.index === currentSentenceIndex;
         return (
           <li
             key={sentence.index}
-            className="flex gap-3 p-3 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+            className={`flex gap-3 p-3 rounded border ${SENTENCE_BG_STYLES[noteState]}${isCurrent ? " ring-2 ring-blue-400 dark:ring-blue-500" : ""}`}
           >
             <span className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-sm font-bold">
               {sentence.index + 1}
             </span>
             <div className="flex-1 min-w-0">
-              <p className="pt-1">{sentence.content}</p>
+              <div className="flex items-center gap-2 pt-1">
+                <span>{sentence.content}</span>
+                {isCurrent && (
+                  <span className="shrink-0 px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 animate-pulse">
+                    読書中
+                  </span>
+                )}
+              </div>
               {relatedSteps && relatedSteps.length > 0 && (
                 <div className="mt-2 flex flex-col gap-1">
                   {relatedSteps.map((step) => (

@@ -76,7 +76,7 @@ function App() {
           )}
 
           <div className="flex-1 overflow-y-auto">
-            <SentenceList sentences={sentences} steps={simulation.steps} />
+            <SentenceList sentences={sentences} steps={simulation.steps} isRunning={simulation.status === "running"} />
           </div>
         </div>
       ) : (

@@ -107,8 +107,8 @@ func TestRun_Integration_TextOutput(t *testing.T) {
 	}
 
 	output := stdout.String()
-	if !strings.Contains(output, "[Step 0]") {
-		t.Errorf("expected Step 0 in output, got: %s", output)
+	if !strings.Contains(output, "[Step 1]") {
+		t.Errorf("expected Step 1 in output, got: %s", output)
 	}
 	if !strings.Contains(output, "Note[QUESTION]: これは何？") {
 		t.Errorf("expected QUESTION note, got: %s", output)
@@ -235,7 +235,7 @@ func TestRun_PersonaNotFound(t *testing.T) {
 
 func TestOutputStepJSON(t *testing.T) {
 	step := core.SimulationStep{
-		Step:        0,
+		Step:        1,
 		SentenceIdx: 0,
 		TargetIdx:   intPtr(1),
 		Note:        &core.Note{Type: core.NoteTypeQuestion, Content: "テスト疑問"},
@@ -297,19 +297,19 @@ func TestOutputStepText(t *testing.T) {
 
 	steps := []core.SimulationStep{
 		{
-			Step:        0,
+			Step:        1,
 			SentenceIdx: 0,
 			TargetIdx:   intPtr(1),
 			Note:        &core.Note{Type: core.NoteTypeQuestion, Content: "疑問"},
 		},
 		{
-			Step:        1,
+			Step:        2,
 			SentenceIdx: 1,
 			TargetIdx:   intPtr(0),
 			Note:        nil,
 		},
 		{
-			Step:        2,
+			Step:        3,
 			SentenceIdx: 0,
 			TargetIdx:   nil,
 			Note:        &core.Note{Type: core.NoteTypeResolved, Content: "解消"},
@@ -325,9 +325,9 @@ func TestOutputStepText(t *testing.T) {
 
 	output := stdout.String()
 
-	// Step 0: 先読み
-	if !strings.Contains(output, "[Step 0] 文0: 文1。") {
-		t.Errorf("expected step 0 header, got: %s", output)
+	// Step 1: 先読み
+	if !strings.Contains(output, "[Step 1] 文0: 文1。") {
+		t.Errorf("expected step 1 header, got: %s", output)
 	}
 	if !strings.Contains(output, "Note[QUESTION]: 疑問") {
 		t.Errorf("expected QUESTION note, got: %s", output)
@@ -358,7 +358,7 @@ func TestOutputStepText_Reread(t *testing.T) {
 	}
 
 	step := core.SimulationStep{
-		Step:        0,
+		Step:        1,
 		SentenceIdx: 0,
 		TargetIdx:   intPtr(0),
 	}

@@ -70,17 +70,17 @@ func TestRunSimulation_NormalCompletion(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			// Step 0: note
-			{CurrentIndex: 0, NextIndex: intPtr(1), Note: nil},
-			// Step 0: memory
-			{Memory: "文1を読んだ"},
 			// Step 1: note
-			{CurrentIndex: 1, NextIndex: intPtr(2), Note: &Note{Type: NoteTypeQuestion, Content: "なぜ？"}},
+			{CurrentIndex: 0, NextIndex: intPtr(1), Note: nil},
 			// Step 1: memory
-			{Memory: "文1と文2を読んだ"},
+			{Memory: "文1を読んだ"},
 			// Step 2: note
-			{CurrentIndex: 2, NextIndex: nil, Note: nil},
+			{CurrentIndex: 1, NextIndex: intPtr(2), Note: &Note{Type: NoteTypeQuestion, Content: "なぜ？"}},
 			// Step 2: memory
+			{Memory: "文1と文2を読んだ"},
+			// Step 3: note
+			{CurrentIndex: 2, NextIndex: nil, Note: nil},
+			// Step 3: memory
 			{Memory: "全部読んだ"},
 		},
 	}
@@ -96,31 +96,31 @@ func TestRunSimulation_NormalCompletion(t *testing.T) {
 		t.Fatalf("expected 3 steps, got %d", len(steps))
 	}
 
-	// Step 0
-	if steps[0].Step != 0 || steps[0].SentenceIdx != 0 {
-		t.Errorf("step 0: got Step=%d, SentenceIdx=%d", steps[0].Step, steps[0].SentenceIdx)
+	// Step 1
+	if steps[0].Step != 1 || steps[0].SentenceIdx != 0 {
+		t.Errorf("step 1: got Step=%d, SentenceIdx=%d", steps[0].Step, steps[0].SentenceIdx)
 	}
 	if steps[0].TargetIdx == nil || *steps[0].TargetIdx != 1 {
-		t.Errorf("step 0: expected TargetIdx=1, got %v", steps[0].TargetIdx)
+		t.Errorf("step 1: expected TargetIdx=1, got %v", steps[0].TargetIdx)
 	}
 	if steps[0].Note != nil {
-		t.Errorf("step 0: expected no note")
-	}
-
-	// Step 1
-	if steps[1].Step != 1 || steps[1].SentenceIdx != 1 {
-		t.Errorf("step 1: got Step=%d, SentenceIdx=%d", steps[1].Step, steps[1].SentenceIdx)
-	}
-	if steps[1].Note == nil || steps[1].Note.Type != NoteTypeQuestion {
-		t.Errorf("step 1: expected QUESTION note")
+		t.Errorf("step 1: expected no note")
 	}
 
 	// Step 2
-	if steps[2].Step != 2 || steps[2].SentenceIdx != 2 {
-		t.Errorf("step 2: got Step=%d, SentenceIdx=%d", steps[2].Step, steps[2].SentenceIdx)
+	if steps[1].Step != 2 || steps[1].SentenceIdx != 1 {
+		t.Errorf("step 2: got Step=%d, SentenceIdx=%d", steps[1].Step, steps[1].SentenceIdx)
+	}
+	if steps[1].Note == nil || steps[1].Note.Type != NoteTypeQuestion {
+		t.Errorf("step 2: expected QUESTION note")
+	}
+
+	// Step 3
+	if steps[2].Step != 3 || steps[2].SentenceIdx != 2 {
+		t.Errorf("step 3: got Step=%d, SentenceIdx=%d", steps[2].Step, steps[2].SentenceIdx)
 	}
 	if steps[2].TargetIdx != nil {
-		t.Errorf("step 2: expected nil TargetIdx for completion")
+		t.Errorf("step 3: expected nil TargetIdx for completion")
 	}
 }
 
@@ -141,16 +141,16 @@ func TestRunSimulation_MaxStepsTermination(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			// Step 0: note, memory
+			// Step 1: note, memory
 			{CurrentIndex: 0, NextIndex: intPtr(1)},
 			{Memory: "m1"},
-			// Step 1: note, memory
+			// Step 2: note, memory
 			{CurrentIndex: 1, NextIndex: intPtr(0)},
 			{Memory: "m2"},
-			// Step 2: note, memory
+			// Step 3: note, memory
 			{CurrentIndex: 0, NextIndex: intPtr(1)},
 			{Memory: "m3"},
-			// Step 3 (won't reach): note, memory
+			// Step 4 (won't reach): note, memory
 			{CurrentIndex: 1, NextIndex: intPtr(0)},
 			{Memory: "m4"},
 		},
@@ -184,16 +184,16 @@ func TestRunSimulation_DefaultMaxSteps(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			// Step 0: note, memory
-			{CurrentIndex: 0, NextIndex: intPtr(0)},
-			{Memory: "m1"},
 			// Step 1: note, memory
 			{CurrentIndex: 0, NextIndex: intPtr(0)},
-			{Memory: "m2"},
+			{Memory: "m1"},
 			// Step 2: note, memory
 			{CurrentIndex: 0, NextIndex: intPtr(0)},
+			{Memory: "m2"},
+			// Step 3: note, memory
+			{CurrentIndex: 0, NextIndex: intPtr(0)},
 			{Memory: "m3"},
-			// Step 3 (won't reach): note, memory
+			// Step 4 (won't reach): note, memory
 			{CurrentIndex: 0, NextIndex: intPtr(0)},
 			{Memory: "m4"},
 		},
@@ -228,13 +228,13 @@ func TestRunSimulation_ProviderErrorOnNote(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			// Step 0: note, memory
+			// Step 1: note, memory
 			{CurrentIndex: 0, NextIndex: intPtr(1)},
 			{Memory: "m1"},
 		},
 		errors: []error{
 			nil, nil,
-			errors.New("LLM connection failed"), // Step 1 note fails
+			errors.New("LLM connection failed"), // Step 2 note fails
 		},
 	}
 
@@ -369,10 +369,10 @@ func TestRunSimulation_MemoryCapacityAppliedToNextStep(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			// Step 0
+			// Step 1
 			{CurrentIndex: 0, NextIndex: intPtr(1)}, // note
 			{Memory: "あいうえお"},                       // memory (will be truncated to 3 chars)
-			// Step 1
+			// Step 2
 			{CurrentIndex: 1, NextIndex: nil}, // note
 			{Memory: "ok"},                    // memory
 		},
@@ -411,16 +411,16 @@ func TestRunSimulation_Backtracking(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			// Step 0: note, memory
+			// Step 1: note, memory
 			{CurrentIndex: 0, NextIndex: intPtr(1)},
 			{Memory: "m1"},
-			// Step 1: note (backtrack), memory
+			// Step 2: note (backtrack), memory
 			{CurrentIndex: 1, NextIndex: intPtr(0)},
 			{Memory: "m2"},
-			// Step 2: note, memory
+			// Step 3: note, memory
 			{CurrentIndex: 0, NextIndex: intPtr(2)},
 			{Memory: "m3"},
-			// Step 3: note (done), memory
+			// Step 4: note (done), memory
 			{CurrentIndex: 2, NextIndex: nil},
 			{Memory: "m4"},
 		},
@@ -462,10 +462,10 @@ func TestRunSimulation_RequestFields(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			// Step 0: note, memory
+			// Step 1: note, memory
 			{CurrentIndex: 0, NextIndex: intPtr(1)},
 			{Memory: "記憶1"},
-			// Step 1: note, memory
+			// Step 2: note, memory
 			{CurrentIndex: 1, NextIndex: nil},
 			{Memory: "記憶2"},
 		},
@@ -482,7 +482,7 @@ func TestRunSimulation_RequestFields(t *testing.T) {
 		t.Fatalf("expected 4 calls, got %d", len(mock.calls))
 	}
 
-	// Step 0 note request (calls[0])
+	// Step 1 note request (calls[0])
 	noteReq0 := mock.calls[0]
 	if noteReq0.Phase != PhaseNote {
 		t.Errorf("calls[0].Phase: got %d, want PhaseNote", noteReq0.Phase)
@@ -503,13 +503,13 @@ func TestRunSimulation_RequestFields(t *testing.T) {
 		t.Errorf("calls[0].Memory: got %q, want empty", noteReq0.Memory)
 	}
 
-	// Step 0 memory request (calls[1])
+	// Step 1 memory request (calls[1])
 	memReq0 := mock.calls[1]
 	if memReq0.Phase != PhaseMemory {
 		t.Errorf("calls[1].Phase: got %d, want PhaseMemory", memReq0.Phase)
 	}
 
-	// Step 1 note request (calls[2])
+	// Step 2 note request (calls[2])
 	noteReq1 := mock.calls[2]
 	if noteReq1.Phase != PhaseNote {
 		t.Errorf("calls[2].Phase: got %d, want PhaseNote", noteReq1.Phase)
@@ -639,10 +639,10 @@ func TestRunSimulation_LogOutput(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			// Step 0: note, memory
+			// Step 1: note, memory
 			{CurrentIndex: 0, NextIndex: intPtr(1)},
 			{Memory: "m1"},
-			// Step 1: note, memory
+			// Step 2: note, memory
 			{CurrentIndex: 1, NextIndex: nil},
 			{Memory: "m2"},
 		},
@@ -719,10 +719,10 @@ func TestRunSimulation_CallbackCalledPerStep(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			// Step 0: note, memory
+			// Step 1: note, memory
 			{CurrentIndex: 0, NextIndex: intPtr(1)},
 			{Memory: "m1"},
-			// Step 1: note, memory
+			// Step 2: note, memory
 			{CurrentIndex: 1, NextIndex: nil},
 			{Memory: "m2"},
 		},
@@ -741,8 +741,8 @@ func TestRunSimulation_CallbackCalledPerStep(t *testing.T) {
 	if len(callOrder) != 2 {
 		t.Fatalf("expected 2 callback calls, got %d", len(callOrder))
 	}
-	if callOrder[0] != 0 || callOrder[1] != 1 {
-		t.Errorf("expected callback order [0, 1], got %v", callOrder)
+	if callOrder[0] != 1 || callOrder[1] != 2 {
+		t.Errorf("expected callback order [1, 2], got %v", callOrder)
 	}
 }
 
@@ -763,7 +763,7 @@ func TestRunSimulation_CallbackError(t *testing.T) {
 	}
 	mock := &mockProvider{
 		responses: []SimulationResponse{
-			// Step 0: note, memory
+			// Step 1: note, memory
 			{CurrentIndex: 0, NextIndex: intPtr(1)},
 			{Memory: "m1"},
 		},
@@ -771,7 +771,7 @@ func TestRunSimulation_CallbackError(t *testing.T) {
 
 	callbackErr := errors.New("output failed")
 	onStep := func(s SimulationStep) error {
-		if s.Step == 0 {
+		if s.Step == 1 {
 			return callbackErr
 		}
 		return nil

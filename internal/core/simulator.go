@@ -29,7 +29,7 @@ func RunSimulation(doc Document, persona Persona, provider Provider, logger *slo
 	currentIdx := 0
 	completedSteps := 0
 
-	for step := 0; step < maxSteps; step++ {
+	for step := 1; step <= maxSteps; step++ {
 		// Phase 1: 感想生成（note + next_index）
 		noteReq := SimulationRequest{
 			Phase:           PhaseNote,
