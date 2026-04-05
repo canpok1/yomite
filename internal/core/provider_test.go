@@ -137,7 +137,7 @@ func TestBuildNotePromptContainsLastIndex(t *testing.T) {
 	}
 }
 
-func TestBuildMemoryPromptContainsPlainTextInstruction(t *testing.T) {
+func TestBuildMemoryPromptContainsSummaryRules(t *testing.T) {
 	req := SimulationRequest{
 		Phase:           PhaseMemory,
 		SystemPrompt:    "あなたは初学者の読者です。",
@@ -151,8 +151,8 @@ func TestBuildMemoryPromptContainsPlainTextInstruction(t *testing.T) {
 
 	_, user := BuildMemoryPrompt(req)
 
-	if !strings.Contains(user, "プレーンテキスト") {
-		t.Error("user message should mention plain text format")
+	if !strings.Contains(user, "要約ルール") {
+		t.Error("user message should mention summary rules")
 	}
 	if !strings.Contains(user, "テスト感想") {
 		t.Error("user message should contain note content")
