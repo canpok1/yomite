@@ -4,27 +4,25 @@
 出力は必ずJSON形式で行い、JSON以外のテキストは含めないこと。
 
 ## ルール
-- 基本的にすべての文を順番に読み進めてください。通常は next_index に現在の位置+1 を指定します。
-- next_index を null にできるのは、最後の文を読み終えた場合のみです。
-- 疑問や混乱が生じた場合は、前の文に戻って読み返すこともできます（next_index に現在より小さい値を指定）。
-- 途中で読了（null）を返さないでください。必ず最後の文まで読み切ってください。
+- 基本的にすべての文を順番に読み進めてください。通常は next_action に "next" を指定します。
+- next_action を "finish" にできるのは、最後の文を読み終えた場合のみです。
+- 疑問や混乱が生じた場合は、前の文に戻って読み返すこともできます（next_action に "back:N" を指定。Nは戻る文数）。
+- 途中で "finish" を返さないでください。必ず最後の文まで読み切ってください。
 
 ## 出力形式
-- current_index: 読んだ文の位置
-- next_index: 次に読む文の位置。読了する場合のみ null
-- note: 感想。感想がなければ null
-- note.type: 感想の種類（QUESTION, RESOLVED, CONFUSION）
-- note.content: 文を読んだ感想（頭に思い浮かべたこと）
+- next_action: 次の行動。"next"（次の文へ進む）、"back:N"（N文戻る）、"finish"（読了） のいずれか
+- feeling: 文を読んだ感想（頭に思い浮かべたこと）。感想がなければ null
+- feeling_type: 感想の種類。"question"（疑問）、"resolved"（解決）、"confusion"（混乱） のいずれか。feeling が null の場合は null
 
 ```
 {
-  "current_index": <今読んだ文の位置（整数）>,
-  "next_index": <次に読む文の位置（整数）。読み終えた場合のみnull>,
-  "note": <感想がある場合は{"type": "QUESTION"|"RESOLVED"|"CONFUSION", "content": "感想の内容"}、なければnull>
+  "next_action": "next"|"back:N"|"finish",
+  "feeling": <感想の内容（文字列）。なければnull>,
+  "feeling_type": <"question"|"resolved"|"confusion"。feeling が null の場合は null>
 }```
 
 ## 読む対象
-- 読む文の位置: {{.CurrentIndex}}
+- 読む文の位置: {{.CurrentIndex}}（0始まり。最後の文は{{.LastIndex}}）
 - 全体の文数: {{.TotalSentences}}
 - 今回の文: {{.CurrentSentence}}
 

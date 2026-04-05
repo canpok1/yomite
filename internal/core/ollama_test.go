@@ -14,8 +14,8 @@ import (
 // content にはLLMの出力テキストを指定する。
 func newOllamaChatServer(content string) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		resp := map[string]interface{}{
-			"message": map[string]interface{}{
+		resp := map[string]any{
+			"message": map[string]any{
 				"role":    "assistant",
 				"content": content,
 			},
@@ -44,8 +44,7 @@ func TestOllamaProvider_ImplementsProvider(t *testing.T) {
 }
 
 func TestOllamaProvider_Execute_NotePhase(t *testing.T) {
-	nextIdx := 1
-	content := `{"current_index": 0, "next_index": 1, "note": null}`
+	content := `{"next_action": "next", "feeling": null, "feeling_type": null}`
 
 	server := newOllamaChatServer(content)
 	defer server.Close()
@@ -68,13 +67,13 @@ func TestOllamaProvider_Execute_NotePhase(t *testing.T) {
 	if got.CurrentIndex != 0 {
 		t.Errorf("CurrentIndex: got %d, want 0", got.CurrentIndex)
 	}
-	if got.NextIndex == nil || *got.NextIndex != nextIdx {
-		t.Errorf("NextIndex: got %v, want %d", got.NextIndex, nextIdx)
+	if got.NextIndex == nil || *got.NextIndex != 1 {
+		t.Errorf("NextIndex: got %v, want 1", got.NextIndex)
 	}
 }
 
 func TestOllamaProvider_Execute_MemoryPhase(t *testing.T) {
-	content := `{"memory": "テスト記憶"}`
+	content := "テスト記憶"
 
 	server := newOllamaChatServer(content)
 	defer server.Close()
@@ -101,7 +100,7 @@ func TestOllamaProvider_Execute_MemoryPhase(t *testing.T) {
 }
 
 func TestOllamaProvider_Execute_RequestFormat(t *testing.T) {
-	var receivedBody map[string]interface{}
+	var receivedBody map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -114,14 +113,10 @@ func TestOllamaProvider_Execute_RequestFormat(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(body, &receivedBody)
 
-		nextIdx := 1
-		simResp := SimulationResponse{CurrentIndex: 0, NextIndex: &nextIdx, Memory: "mem"}
-		simRespJSON, _ := json.Marshal(simResp)
-
-		resp := map[string]interface{}{
-			"message": map[string]interface{}{
+		resp := map[string]any{
+			"message": map[string]any{
 				"role":    "assistant",
-				"content": string(simRespJSON),
+				"content": `{"next_action": "next", "feeling": null, "feeling_type": null}`,
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -148,17 +143,17 @@ func TestOllamaProvider_Execute_RequestFormat(t *testing.T) {
 		t.Errorf("stream: got %v, want false", receivedBody["stream"])
 	}
 
-	messages, ok := receivedBody["messages"].([]interface{})
+	messages, ok := receivedBody["messages"].([]any)
 	if !ok || len(messages) != 2 {
 		t.Fatalf("messages: got %v, want 2 messages", receivedBody["messages"])
 	}
 
-	sysMsg := messages[0].(map[string]interface{})
+	sysMsg := messages[0].(map[string]any)
 	if sysMsg["role"] != "system" {
 		t.Errorf("messages[0].role: got %v, want system", sysMsg["role"])
 	}
 
-	userMsg := messages[1].(map[string]interface{})
+	userMsg := messages[1].(map[string]any)
 	if userMsg["role"] != "user" {
 		t.Errorf("messages[1].role: got %v, want user", userMsg["role"])
 	}
