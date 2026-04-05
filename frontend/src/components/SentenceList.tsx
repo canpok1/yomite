@@ -96,6 +96,11 @@ function StepRow({ step }: { step: SimulationStep }) {
             [{NOTE_LABELS[step.note.type]}]
           </span>
         )}
+        {step.duration_ms > 0 && (
+          <span className="text-xs text-gray-400 dark:text-gray-500">
+            {(step.duration_ms / 1000).toFixed(1)}s
+          </span>
+        )}
         {step.memory && (
           <button
             type="button"

@@ -124,6 +124,7 @@ type SimulationStep struct {
     TargetIdx   *int   `json:"next_index"`   // 次に読む文の位置 (nil = 読了)
     Note        *Note  `json:"note"`         // 思考の内容 (nil = 感想なし)
     Memory      string `json:"memory"`       // このステップ時点での記憶内容
+    DurationMs  int64  `json:"duration_ms"`  // ステップの処理時間（ミリ秒）
 }
 
 type Note struct {
