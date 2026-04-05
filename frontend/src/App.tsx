@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Editor } from "./components/Editor";
 import { SentenceList } from "./components/SentenceList";
-import { StepList } from "./components/StepList";
 import { useSimulation, type SimulationStatus } from "./hooks/useSimulation";
 import { LoadDocument } from "../wailsjs/go/gui/App";
 import type { Sentence } from "./types";
@@ -29,6 +28,8 @@ function App() {
   const [sentences, setSentences] = useState<Sentence[]>([]);
   const simulation = useSimulation();
 
+  const isResultView = sentences.length > 0 && simulation.status !== "idle";
+
   async function handleStart(text: string, providerID: string, personaID: string) {
     const result = await LoadDocument(text);
     setSentences(result);
@@ -45,32 +46,9 @@ function App() {
         <h1 className="text-xl font-bold">yomite</h1>
       </header>
 
-      <div className="flex-1 flex min-h-0">
-        {/* 左パネル: エディタ */}
-        <section className="w-1/2 p-4 border-r border-gray-200 dark:border-gray-700 flex flex-col">
-          <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-2">
-            ドキュメント
-          </h2>
-          <div className="flex-1 flex flex-col min-h-0">
-            <Editor
-              onStart={handleStart}
-              onStop={handleStop}
-              status={simulation.status}
-            />
-          </div>
-          {sentences.length > 0 && (
-            <div className="mt-4 overflow-y-auto max-h-[40%]">
-              <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-2">
-                文一覧
-              </h2>
-              <SentenceList sentences={sentences} />
-            </div>
-          )}
-        </section>
-
-        {/* 右パネル: シミュレーション結果 */}
-        <section className="w-1/2 p-4 flex flex-col">
-          <div className="flex items-center gap-3 mb-2">
+      {isResultView ? (
+        <div className="flex-1 flex flex-col min-h-0 p-4">
+          <div className="flex items-center gap-3 mb-3">
             <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400">
               シミュレーション結果
             </h2>
@@ -81,6 +59,14 @@ function App() {
                 {STATUS_BADGE[simulation.status]!.label}
               </span>
             )}
+            {simulation.status === "running" && (
+              <button
+                onClick={handleStop}
+                className="ml-auto px-4 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+              >
+                停止
+              </button>
+            )}
           </div>
 
           {simulation.error && (
@@ -90,16 +76,36 @@ function App() {
           )}
 
           <div className="flex-1 overflow-y-auto">
-            {simulation.steps.length > 0 ? (
-              <StepList steps={simulation.steps} sentences={sentences} />
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500">
-                <p>シミュレーション結果がここに表示されます</p>
-              </div>
-            )}
+            <SentenceList sentences={sentences} steps={simulation.steps} />
           </div>
-        </section>
-      </div>
+        </div>
+      ) : (
+        <div className="flex-1 flex min-h-0">
+          {/* 左パネル: エディタ */}
+          <section className="w-1/2 p-4 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+            <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-2">
+              ドキュメント
+            </h2>
+            <div className="flex-1 flex flex-col min-h-0">
+              <Editor
+                onStart={handleStart}
+                onStop={handleStop}
+                status={simulation.status}
+              />
+            </div>
+          </section>
+
+          {/* 右パネル: プレースホルダ */}
+          <section className="w-1/2 p-4 flex flex-col">
+            <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-2">
+              シミュレーション結果
+            </h2>
+            <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500">
+              <p>シミュレーション結果がここに表示されます</p>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
