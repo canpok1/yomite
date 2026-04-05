@@ -39,7 +39,10 @@ function getArrowType(step: SimulationStep): ArrowType {
   return "backward";
 }
 
-function getSentenceElement(container: HTMLElement, index: number): HTMLElement | null {
+function getSentenceElement(
+  container: HTMLElement,
+  index: number,
+): HTMLElement | null {
   return container.querySelector(`[data-sentence-index="${index}"]`);
 }
 
@@ -69,11 +72,16 @@ export function GazeArrows({ steps, containerRef }: GazeArrowsProps) {
 
     const arrows: ArrowData[] = [];
     for (const step of steps) {
+      const type = getArrowType(step);
+      // NOTE: forward矢印は非表示にする。
+      // 読書中の視線移動はほとんどが前進であり、表示すると矢印が大量になって見づらいため。
+      if (type === "forward") continue;
+
       const fromEl = getEl(step.current_index);
       if (!fromEl) continue;
 
-      const fromY = getElementCenterY(fromEl, containerRect) + container.scrollTop;
-      const type = getArrowType(step);
+      const fromY =
+        getElementCenterY(fromEl, containerRect) + container.scrollTop;
 
       if (type === "done") {
         arrows.push({ stepNumber: step.step, type, fromY, toY: fromY });
@@ -155,7 +163,8 @@ export function GazeArrows({ steps, containerRef }: GazeArrowsProps) {
           const cy2 = arrow.fromY + loopR;
           d = `M ${ARROW_X} ${arrow.fromY} C ${cx} ${cy1} ${cx} ${cy2} ${ARROW_X} ${arrow.fromY}`;
         } else {
-          const controlPointX = ARROW_X + Math.min(Math.abs(arrow.toY - arrow.fromY) * 0.3, 30);
+          const controlPointX =
+            ARROW_X + Math.min(Math.abs(arrow.toY - arrow.fromY) * 0.3, 30);
           d = `M ${ARROW_X} ${arrow.fromY} C ${controlPointX} ${arrow.fromY} ${controlPointX} ${arrow.toY} ${ARROW_X} ${arrow.toY}`;
         }
 
