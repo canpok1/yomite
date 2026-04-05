@@ -143,6 +143,7 @@ export function SentenceList({ sentences, steps = [], isRunning = false }: Sente
         return (
           <li
             key={sentence.index}
+            data-sentence-index={sentence.index}
             className={`flex gap-3 p-3 rounded border ${SENTENCE_BG_STYLES[noteState]}${isCurrent ? " ring-2 ring-blue-400 dark:ring-blue-500" : ""}`}
           >
             <span className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-sm font-bold">
